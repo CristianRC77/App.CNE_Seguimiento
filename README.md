@@ -1,7 +1,7 @@
 # Seguimiento CNE con MongoDB Atlas
 
 La aplicación usa una función API de Vercel para consultar y actualizar la
-colección `zona_electoral` de MongoDB Atlas. El navegador nunca recibe la
+colección `zona_electotal` de MongoDB Atlas. El navegador nunca recibe la
 contraseña de MongoDB ni usa los archivos JSON como fuente de datos.
 
 ## Variables en Vercel
@@ -10,8 +10,8 @@ En **Project Settings > Environment Variables** agrega:
 
 ```env
 MONGODB_URI=mongodb+srv://Vercel-Admin-elecciones_exterior_db:TU_PASSWORD@elecciones-exterior-db.bs5pvnx.mongodb.net/
-MONGODB_DATABASE=elecciones_exterior_db
-MONGODB_COLLECTION=zona_electoral
+MONGODB_DATABASE=db_exterior_cne
+MONGODB_COLLECTION=zona_electotal
 ```
 
 Reemplaza `TU_PASSWORD` por la contraseña real. No la guardes en archivos del
@@ -30,7 +30,7 @@ Si están en el mismo proyecto Vercel, no necesitas `VITE_API_URL`; se usará
 
 En **Network Access** agrega la IP de Vercel o `0.0.0.0/0` para permitir
 conexiones desde funciones serverless. Usa un usuario de base de datos con
-permisos únicamente sobre `elecciones_exterior_db`.
+permisos únicamente sobre `db_exterior_cne`.
 
 La función [api/seguimiento.js](./api/seguimiento.js) expone:
 
