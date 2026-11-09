@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { initialOfficesData } from './assets/data/initialOffices';
 import { statusInfo, milestones } from './assets/constants/cneConstants';
+import {
+  getCachedSeguimiento,
+  loadSeguimiento,
+  saveSeguimiento,
+  subscribeToSeguimiento,
+} from './assets/data/seguimientoService';
 import { exportOfficesToCSV } from './assets/utils/exportUtils';
 import Sidebar from './assets/components/Sidebar';
 import DashboardHeader from './assets/components/DashboardHeader';
@@ -26,21 +32,88 @@ const getElectorWeightedProgress = (offices) => {
   return Math.round(offices.reduce((sum, office) => sum + office.electors * office.progress, 0) / totalElectors);
 };
 
+const createInitialOffices = () => initialOfficesData.map((office) => ({
+  ...office,
+  milestones: milestones.reduce((result, milestone, index) => {
+    result[milestone.id] = office.progress === 100
+      || index < Math.ceil((office.progress / 100) * milestones.length);
+    return result;
+  }, {}),
+}));
+
+const normalizeOffices = (offices) => offices.map((office) => ({
+  ...office,
+  milestones: milestones.reduce((result, milestone, index) => {
+    result[milestone.id] = Boolean(
+      office.milestones?.[milestone.id]
+      ?? (office.progress === 100 || index < Math.ceil((office.progress / 100) * milestones.length))
+    );
+    return result;
+  }, {}),
+}));
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('resumen');
   const [filter, setFilter] = useState('Todas');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(2);
+  const [offices, setOffices] = useState(() => {
+    const cachedOffices = getCachedSeguimiento();
+    return cachedOffices ? normalizeOffices(cachedOffices) : createInitialOffices();
+  });
+  const [syncStatus, setSyncStatus] = useState(() => (
+    getCachedSeguimiento() ? 'Datos locales; verificando sincronización...' : 'Cargando datos...'
+  ));
 
-  const [offices, setOffices] = useState(
-    initialOfficesData.map((office) => ({
-      ...office,
-      milestones: milestones.reduce((result, milestone, index) => {
-        result[milestone.id] = office.progress === 100 || index < Math.ceil((office.progress / 100) * milestones.length);
-        return result;
-      }, {}),
-    }))
-  );
+  useEffect(() => {
+    let active = true;
+
+    const cachedOffices = getCachedSeguimiento();
+
+    const unsubscribe = subscribeToSeguimiento(
+      (savedOffices) => {
+        if (active) {
+          setOffices(normalizeOffices(savedOffices));
+          setSyncStatus('Sincronizado');
+        }
+      },
+      (status) => {
+        if (!active) return;
+        if (status === 'SUBSCRIBED') setSyncStatus('Sincronizado en tiempo real');
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setSyncStatus('Sin tiempo real');
+        }
+      },
+      (error) => {
+        console.error('No se pudo consultar la API de seguimiento.', error);
+        if (active) setSyncStatus('Guardado sin tiempo real');
+      }
+    );
+
+    const loadData = async () => {
+      try {
+        const savedOffices = await loadSeguimiento();
+        if (!active) return;
+        if (savedOffices) setOffices(normalizeOffices(savedOffices));
+        else await saveSeguimiento(cachedOffices || createInitialOffices());
+        setSyncStatus('Sincronizado');
+      } catch (error) {
+        console.error('No se pudo cargar el seguimiento desde MongoDB.', error);
+        if (active) {
+          setSyncStatus(cachedOffices
+            ? 'Datos locales; no se pudo sincronizar'
+            : 'Error de sincronización');
+        }
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   const filteredOffices = useMemo(() => {
     return offices.filter((office) => {
@@ -71,31 +144,35 @@ export default function App() {
   }), [offices]);
 
   const updateMilestone = (id, milestoneId) => {
-    setOffices((current) =>
-      current.map((office) =>
-        office.id === id
-          ? (() => {
-              const milestoneIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
-              const completedMilestones = milestones.map((milestone) => Boolean(office.milestones[milestone.id]));
-              const isChecked = completedMilestones[milestoneIndex];
-              const isNextToMark = !isChecked
-                && completedMilestones.slice(0, milestoneIndex).every(Boolean);
-              const isLastToUnmark = isChecked
-                && completedMilestones.slice(milestoneIndex + 1).every((completed) => !completed);
+    const office = offices.find((item) => item.id === id);
+    if (!office) return;
 
-              if (!isNextToMark && !isLastToUnmark) return office;
+    const milestoneIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
+    const completedMilestones = milestones.map((milestone) => Boolean(office.milestones[milestone.id]));
+    const isChecked = completedMilestones[milestoneIndex];
+    const isNextToMark = !isChecked && completedMilestones.slice(0, milestoneIndex).every(Boolean);
+    const isLastToUnmark = isChecked && completedMilestones.slice(milestoneIndex + 1).every((completed) => !completed);
 
-              const nextMilestones = { ...office.milestones, [milestoneId]: !office.milestones[milestoneId] };
-              return {
-                ...office,
-                milestones: nextMilestones,
-                progress: Math.round((Object.values(nextMilestones).filter(Boolean).length / milestones.length) * 100),
-                updated: 'Justo ahora',
-              };
-            })()
-          : office
-      )
-    );
+    if (!isNextToMark && !isLastToUnmark) return;
+
+    const nextMilestones = { ...office.milestones, [milestoneId]: !isChecked };
+    const nextOffices = offices.map((item) => item.id === id
+      ? {
+          ...item,
+          milestones: nextMilestones,
+          progress: Math.round((Object.values(nextMilestones).filter(Boolean).length / milestones.length) * 100),
+          updated: 'Justo ahora',
+        }
+      : item);
+
+    setOffices(nextOffices);
+    setSyncStatus('Guardando...');
+    void saveSeguimiento(nextOffices)
+      .then(() => setSyncStatus('Sincronizado'))
+      .catch((error) => {
+        console.error('No se pudo guardar el seguimiento en MongoDB.', error);
+        setSyncStatus('Error al guardar');
+      });
   };
 
   const selectedOffice = offices.find((office) => office.id === selectedId) || offices[0];
@@ -108,6 +185,7 @@ export default function App() {
         <DashboardHeader activeTab={activeTab} onExport={() => exportOfficesToCSV(offices)} />
         <MetricsGrid stats={stats} />
 
+        <div className="sync-status" role="status">{syncStatus}</div>
         <section className="content-body">
           {/* Vista: RESUMEN GENERAL */}
           {activeTab === 'resumen' && (
