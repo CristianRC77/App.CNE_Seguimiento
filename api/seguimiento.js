@@ -1,13 +1,18 @@
 import { MongoClient } from 'mongodb';
 
 const mongoUri = process.env.MONGODB_URI;
-const databaseName = process.env.MONGODB_DATABASE || 'elecciones_exterior_db';
-const collectionName = process.env.MONGODB_COLLECTION || 'zona_electoral';
+const databaseName = process.env.MONGODB_DATABASE || 'db_exterior_cne';
+const collectionName = process.env.MONGODB_COLLECTION || 'zona_electotal';
 
 let clientPromise;
 
+// ✅ AQUÍ dentro de la función getCollection
 const getCollection = async () => {
-  if (!mongoUri) throw new Error('Falta la variable MONGODB_URI en Vercel.');
+  console.log('🔍 MONGODB_URI existe:', !!mongoUri);
+  console.log('🔍 Base de datos:', databaseName);
+  console.log('🔍 Colección:', collectionName);
+
+  if (!mongoUri) throw new Error('Falta la variable MONGODB_URI en el entorno de ejecución.');
   if (!clientPromise) clientPromise = new MongoClient(mongoUri).connect();
   const client = await clientPromise;
   return client.db(databaseName).collection(collectionName);
@@ -29,6 +34,7 @@ const toOffice = (document, index) => ({
   juntasWomen: document.juntas_mujer,
   type: document.tipo_junta,
   progress: Number(document.progress || 0),
+  progressStatus: document.estado_Avance,
   milestones: document.milestones || {},
   updated: document.updated || 'Sin actualizar',
 });
@@ -57,7 +63,13 @@ export default async function handler(request, response) {
     const collection = await getCollection();
 
     if (request.method === 'GET') {
+      // ✅ Agregamos también aquí para ver cuántos documentos trae
+      const total = await collection.countDocuments();
+      console.log('📊 Total documentos en colección:', total);
+      
       const documents = await collection.find({}).sort({ zona_codigo: 1 }).toArray();
+      console.log('📄 Documentos recuperados:', documents.length);
+      
       response.status(200).json(documents.map(toOffice));
       return;
     }
@@ -93,6 +105,8 @@ export default async function handler(request, response) {
     response.status(405).json({ error: 'Método no permitido.' });
   } catch (error) {
     console.error('Error en API de seguimiento MongoDB.', error);
-    response.status(500).json({ error: 'No se pudo acceder al seguimiento.' });
+    response.status(500).json({
+      error: error instanceof Error ? error.message : 'No se pudo acceder al seguimiento.',
+    });
   }
 }
