@@ -28,7 +28,8 @@ export const exportOfficesToCSV = (offices) => {
 
 const getOfficeStatus = (office) => {
   const completed = Object.values(office.milestones || {}).filter(Boolean).length;
-  if (completed >= 5) return 'finalizado';
+  if (completed >= 6) return 'finalizado';
+  if (completed === 5) return 'digitalizacion';
   if (completed === 4) return 'escrutinio';
   if (completed >= 3) return 'cierre';
   if (completed === 0) return 'sinEmpezar';

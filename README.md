@@ -38,11 +38,21 @@ La función [api/seguimiento.js](./api/seguimiento.js) expone:
 - `PUT /api/seguimiento`: actualiza `progress`, `milestones`, `estado_Avance`
   y `updated`.
 
-La colección debe contener los campos del JSON importado, especialmente
-`zona_codigo`. Las computadoras consultan la API cada cinco segundos para
+La colección `zona_electotal` debe contener los campos operativos, especialmente
+`zona_codigo`, `oficina_codigo`, `pais_codigo` y `circunscripcion_codigo`.
+Las colecciones `oficina_consular`, `pais` y `circunscripciones` funcionan como
+catálogos relacionados por `codigo`; la API resuelve esos nombres antes de
+entregarlos al frontend. Las computadoras consultan la API cada cinco segundos para
 mostrar cambios realizados desde otra computadora. La función actualiza
 directamente esos documentos; no crea una colección nueva ni usa el JSON
 después de desplegar.
+
+Cada documento usa `dataVersion` para control de concurrencia. Las modificaciones
+envían únicamente la zona cambiada y la API solo la guarda si su versión todavía
+coincide con la versión leída por el usuario. Si otro usuario modificó la misma
+zona primero, la API responde `409`, el cliente recarga el snapshot central y no
+sobrescribe el cambio ajeno. La caché de `localStorage` se actualiza únicamente
+después de una respuesta exitosa de MongoDB.
 
 Después de agregar las variables, vuelve a desplegar el proyecto en Vercel.
 

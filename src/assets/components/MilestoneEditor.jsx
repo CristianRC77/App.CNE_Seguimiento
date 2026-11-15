@@ -7,8 +7,12 @@ export default function MilestoneEditor({
   selectedOffice,
   selectedId,
   setSelectedId,
+  selectedActaType,
+  setSelectedActaType,
   milestones,
   updateMilestone,
+  updateActa,
+  markAllActas,
   getOfficeStatus,
   statusInfo,
 }) {
@@ -16,6 +20,15 @@ export default function MilestoneEditor({
   const [zoneSearch, setZoneSearch] = useState('');
   const selectedStatus = getOfficeStatus(selectedOffice);
   const completedMilestones = Object.values(selectedOffice.milestones).filter(Boolean).length;
+  const actas = selectedOffice.actasDigitalizadas?.[selectedActaType] || { hombres: [], mujeres: [] };
+  const actaMultiplier = selectedActaType === 'escrutinio' ? 3 : 1;
+  const totalActasHombres = selectedOffice.juntasMen * actaMultiplier;
+  const totalActasMujeres = selectedOffice.juntasWomen * actaMultiplier;
+  const digitalizadasHombres = actas.hombres.filter(Boolean).length;
+  const digitalizadasMujeres = actas.mujeres.filter(Boolean).length;
+  const totalActas = totalActasHombres + totalActasMujeres;
+  const digitalizadasActas = digitalizadasHombres + digitalizadasMujeres;
+  const actasProgress = totalActas ? Math.round((digitalizadasActas / totalActas) * 100) : 0;
   const circunscriptions = [...new Set(offices.map((office) => office.circunscription))].sort();
   const normalizedSearch = zoneSearch.trim().toLowerCase();
   const filteredOffices = offices.filter((office) => {
@@ -122,24 +135,109 @@ export default function MilestoneEditor({
             const milestoneIndex = milestones.findIndex((item) => item.id === milestone.id);
             const milestoneStates = milestones.map((item) => Boolean(selectedOffice.milestones[item.id]));
             const isChecked = milestoneStates[milestoneIndex];
-            const canMark = !isChecked && milestoneStates.slice(0, milestoneIndex).every(Boolean);
-            const canUnmark = isChecked && milestoneStates.slice(milestoneIndex + 1).every((completed) => !completed);
+            const isDigitalization = milestoneIndex >= 4;
+            const actaType = milestoneIndex === 4 ? 'escrutinio' : 'instalacion';
+            const isActaComplete = isDigitalization
+              ? [selectedOffice.actasDigitalizadas?.[actaType]?.hombres || [],
+                selectedOffice.actasDigitalizadas?.[actaType]?.mujeres || []]
+                .flat()
+                .every(Boolean)
+              : isChecked;
+            const isSelected = isDigitalization && selectedActaType === actaType;
+            const canMark = !isChecked && (
+              isDigitalization
+                ? milestoneStates[3]
+                : milestoneStates.slice(0, milestoneIndex).every(Boolean)
+            );
+            const canUnmark = isChecked && (
+              isDigitalization
+                ? true
+                : milestoneStates.slice(milestoneIndex + 1).every((completed) => !completed)
+            );
             const isEnabled = canMark || canUnmark;
             return (
               <button
                 key={milestone.id}
-                className={`milestone-btn ${isChecked ? 'checked' : ''} ${isEnabled ? '' : 'locked'}`}
-                onClick={() => updateMilestone(selectedOffice.id, milestone.id)}
+                className={`milestone-btn ${isDigitalization && isActaComplete ? 'completed' : ''} ${isDigitalization && !isActaComplete ? 'pending' : ''} ${!isDigitalization && isChecked ? 'checked' : ''} ${isSelected ? 'selected' : ''} ${isEnabled ? '' : 'locked'}`}
+                onClick={() => {
+                  if (isDigitalization) {
+                    setSelectedActaType(actaType);
+                    return;
+                  }
+                  if (milestoneIndex === 3) setSelectedActaType('escrutinio');
+                  updateMilestone(selectedOffice.id, milestone.id);
+                }}
                 disabled={!isEnabled}
-                aria-pressed={isChecked}
-                title={!isEnabled ? 'Debes completar los hitos anteriores en orden' : undefined}
+                aria-pressed={isDigitalization ? isSelected : isChecked}
+                title={!isEnabled
+                  ? isDigitalization
+                    ? 'Debes seleccionar Inicio de escrutinio'
+                    : 'Debes completar los hitos anteriores en orden'
+                  : undefined}
               >
-                <span className="checkbox">{isChecked ? '✓' : milestone.icon}</span>
+                <span className="checkbox">{isActaComplete ? '✓' : milestone.icon}</span>
                 <span>{milestone.label}</span>
               </button>
             );
           })}
         </div>
+
+        {selectedActaType && selectedOffice.milestones.inicioEscrutinio && (
+        <section className="acts-checklist">
+          <div className="acts-checklist-heading">
+            <div>
+              <h3>
+                Digitalización de actas de {selectedActaType === 'escrutinio' ? 'escrutinio' : 'instalación'}
+              </h3>
+              <p>Marca cada acta conforme se complete su digitalización.</p>
+            </div>
+            <strong>
+              {digitalizadasActas}/{totalActas} digitalizadas
+            </strong>
+            <button
+              className="mark-all-btn"
+              type="button"
+              onClick={() => markAllActas(selectedOffice.id, selectedActaType)}
+              disabled={digitalizadasActas === totalActas}
+            >
+              Marcar todo
+            </button>
+          </div>
+
+          <div className="acts-checklist-summary">
+            <span>Hombres: <b>{digitalizadasHombres}/{totalActasHombres}</b></span>
+            <span>Mujeres: <b>{digitalizadasMujeres}/{totalActasMujeres}</b></span>
+            <span>Pendientes: <b>{totalActas - digitalizadasActas}</b></span>
+            <span>Avance: <b>{actasProgress}%</b></span>
+          </div>
+          <div className="acts-checklist-progress" aria-label={`Avance de digitalización: ${actasProgress}%`}>
+            <span style={{ width: `${actasProgress}%` }} />
+          </div>
+
+          <div className="acts-checklist-columns">
+            {[
+              { key: 'hombres', label: 'Hombres', total: totalActasHombres },
+              { key: 'mujeres', label: 'Mujeres', total: totalActasMujeres },
+            ].map(({ key, label, total }) => (
+              <div className="acts-category" key={key}>
+                <h4>{label} <span>{total} actas</span></h4>
+                <div className="acts-list">
+                  {Array.from({ length: total }, (_, index) => (
+                    <label className="act-checkbox" key={`${key}-${index + 1}`}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(actas[key][index])}
+                        onChange={() => updateActa(selectedOffice.id, selectedActaType, key, index)}
+                      />
+                      <span>Junta {index + 1}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        )}
       </section>
     </div>
   );

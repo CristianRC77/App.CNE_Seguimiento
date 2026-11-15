@@ -26,7 +26,9 @@ const requestSeguimiento = async (options = {}) => {
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`API de seguimiento (${response.status}): ${details}`);
+    const error = new Error(`API de seguimiento (${response.status}): ${details}`);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -34,17 +36,29 @@ const requestSeguimiento = async (options = {}) => {
 
 export const loadSeguimiento = async () => {
   const offices = await requestSeguimiento();
-  if (!Array.isArray(offices)) throw new Error('La API no devolvió una lista de oficinas.');
+  if (!Array.isArray(offices) || offices.length === 0) {
+    throw new Error('La API devolvió una lista de oficinas vacía o inválida.');
+  }
   cacheSeguimiento(offices);
   return offices;
 };
 
-export const saveSeguimiento = async (offices) => {
-  cacheSeguimiento(offices);
-  await requestSeguimiento({
+export const saveSeguimiento = async (offices, changedIds = null) => {
+  const changedZoneCodes = changedIds
+    ? offices
+      .filter((office) => changedIds.includes(office.id))
+      .map((office) => office.zoneCode)
+      .filter(Boolean)
+    : undefined;
+  const result = await requestSeguimiento({
     method: 'PUT',
-    body: JSON.stringify({ offices }),
+    body: JSON.stringify({ offices, changedZoneCodes }),
   });
+  if (!Array.isArray(result.offices) || result.offices.length === 0) {
+    throw new Error('La API no devolvió el snapshot central después de guardar.');
+  }
+  cacheSeguimiento(result.offices);
+  return result;
 };
 
 export const subscribeToSeguimiento = (onChange, onStatus, onError) => {
