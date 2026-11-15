@@ -3,9 +3,11 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   return (
     <aside className="sidebar">
       <div className="logo-box">
-        <div className="logo-badge">CNE</div>
+        <div className="logo-badge">
+          <img src="/images/logo-cne.png" alt="Logo CNE" className="cne-logo-img" />
+        </div>
         <div>
-          <h2>Seguimiento</h2>
+          <h2>Consejo Nacional Electoral</h2>
           <span>Oficinas Consulares</span>
         </div>
       </div>
