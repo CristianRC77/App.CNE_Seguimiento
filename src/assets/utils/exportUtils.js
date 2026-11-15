@@ -1,18 +1,16 @@
-import { statusInfo, milestones } from '../constants/cneConstants';
+import { statusInfo } from '../constants/cneConstants';
 
 export const exportOfficesToCSV = (offices) => {
   const header = [
-    'Circunscripción', 'País', 'Oficina consular', 'Zona electoral', 'Electores',
-    'Hombres', 'Mujeres', 'Juntas', 'Juntas hombres', 'Juntas mujeres', 'Tipo de junta',
-    'Estado', 'Avance (%)', ...milestones.map((m) => m.label), 'Última actualización'
+    'Circunscripción', 'País', 'Oficina consular', 'Zona electoral',
+    'Juntas', 'Juntas hombres', 'Juntas mujeres', 'Tipo de junta',
+    'Estado'
   ];
   
   const rows = offices.map((office) => [
-    office.circunscription, office.country, office.name, office.zone, office.electors,
-    office.men, office.women, office.juntas, office.juntasMen, office.juntasWomen, office.type,
-    statusInfo[getOfficeStatus(office)].label, office.progress,
-    ...milestones.map((m) => (office.milestones[m.id] ? 'Completado' : 'Pendiente')),
-    office.updated,
+    office.circunscription, office.country, office.name, office.zone,
+    office.juntas, office.juntasMen, office.juntasWomen, office.type,
+    statusInfo[getOfficeStatus(office)].label
   ]);
 
   const escapeCell = (val) => `"${String(val).replaceAll('"', '""')}"`;
