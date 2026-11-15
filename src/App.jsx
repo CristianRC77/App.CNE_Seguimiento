@@ -388,6 +388,40 @@ export default function App() {
     );
   };
 
+  const unmarkAllActas = (id, actaType) => {
+    const nextOffices = offices.map((office) => {
+      if (office.id !== id) return office;
+
+      const multiplier = actaType === 'escrutinio' ? 3 : 1;
+      const nextActas = {
+        hombres: Array(office.juntasMen * multiplier).fill(false),
+        mujeres: Array(office.juntasWomen * multiplier).fill(false),
+      };
+      const nextOffice = {
+        ...office,
+        actasDigitalizadas: {
+          ...office.actasDigitalizadas,
+          [actaType]: nextActas,
+        },
+        milestones: {
+          ...office.milestones,
+          [actaType === 'escrutinio'
+            ? 'digitalizacionEscrutinio'
+            : 'digitalizacionInstalacion']: false,
+        },
+        updated: 'Justo ahora',
+      };
+
+      return { ...nextOffice, progress: getGeneralProgress(nextOffice) };
+    });
+
+    void persistOffices(
+      nextOffices,
+      id,
+      'No se pudo desmarcar la digitalización de actas.'
+    );
+  };
+
   const selectedOffice = offices.find((office) => office.id === selectedId) || offices[0];
 
   return (
@@ -395,7 +429,7 @@ export default function App() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="main-content">
-        <DashboardHeader activeTab={activeTab} onExport={() => exportOfficesToCSV(offices)} />
+        <DashboardHeader activeTab={activeTab} />
         <MetricsGrid stats={stats} />
 
         {syncStatus && <div className="sync-status" role="status">{syncStatus}</div>}
@@ -408,18 +442,6 @@ export default function App() {
                 stats={stats} 
                 statusInfo={statusInfo} 
                 getOfficeStatus={getOfficeStatus} 
-              />
-              <OfficesTable
-                offices={offices}
-                filteredOffices={filteredOffices}
-                filter={filter}
-                setFilter={setFilter}
-                search={search}
-                setSearch={setSearch}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-                statusInfo={statusInfo}
-                getOfficeStatus={getOfficeStatus}
               />
             </>
           )}
@@ -453,6 +475,7 @@ export default function App() {
               updateMilestone={updateMilestone}
               updateActa={updateActa}
               markAllActas={markAllActas}
+              unmarkAllActas={unmarkAllActas}
               getOfficeStatus={getOfficeStatus}
               statusInfo={statusInfo}
             />

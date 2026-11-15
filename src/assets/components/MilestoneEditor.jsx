@@ -13,6 +13,7 @@ export default function MilestoneEditor({
   updateMilestone,
   updateActa,
   markAllActas,
+  unmarkAllActas,
   getOfficeStatus,
   statusInfo,
 }) {
@@ -86,7 +87,6 @@ export default function MilestoneEditor({
                 className={`office-selector ${selectedId === office.id ? 'selected' : ''}`}
                 onClick={() => setSelectedId(office.id)}
               >
-                <span className="office-selector-code">{office.code}</span>
                 <span className="office-selector-info">
                   <strong>{office.zone}</strong>
                   <small>{office.country} · {formatNumber(office.electors)} electores</small>
@@ -201,6 +201,14 @@ export default function MilestoneEditor({
               disabled={digitalizadasActas === totalActas}
             >
               Marcar todo
+            </button>
+            <button
+              className="mark-all-btn"
+              type="button"
+              onClick={() => unmarkAllActas(selectedOffice.id, selectedActaType)}
+              disabled={digitalizadasActas === 0}
+            >
+              Desmarcar todo
             </button>
           </div>
 

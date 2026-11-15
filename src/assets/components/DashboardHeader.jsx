@@ -1,4 +1,4 @@
-export default function DashboardHeader({ activeTab, onExport }) {
+export default function DashboardHeader({ activeTab }) {
   const titles = {
     resumen: 'Resumen General del Proceso',
     oficinas: 'Avances de Oficinas Consulares',
@@ -12,9 +12,6 @@ export default function DashboardHeader({ activeTab, onExport }) {
         <span className="eyebrow">CONSEJO NACIONAL ELECTORAL · ECUADOR</span>
         <h1>{titles[activeTab] || 'Panel de Control'}</h1>
       </div>
-      <button className="export-btn" onClick={onExport}>
-        ⇩ Exportar CSV/Excel
-      </button>
     </header>
   );
 }
