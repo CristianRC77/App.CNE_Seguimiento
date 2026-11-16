@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { initialOfficesData } from './assets/data/initialOffices';
 import { statusInfo, milestones } from './assets/constants/cneConstants';
 import {
@@ -22,11 +22,9 @@ const getOfficeStatus = (office) => {
     return 'finalizado';
   }
   if (completed >= 5) return 'digitalizacion';
-  if (completed === 4) return 'escrutinio';
   if (completed >= 3) return 'cierre';
   if (completed === 0) return 'sinEmpezar';
-  if (completed === 1) return 'instalacion';
-  return 'inicio';
+  return 'instalacion';
 };
 
 const getDigitalizedScrutinyActs = (office) => {
@@ -129,6 +127,14 @@ const normalizeOffices = (offices) => offices.map((office) => {
 
 const getOfficeKey = (office) => `${office.country}|${office.zone}`;
 
+const isExcludedFromGeneralPercentage = (office) => {
+  const country = String(office.country || '').trim().toUpperCase();
+  const zone = String(office.zone || '').trim().toUpperCase();
+
+  return (country === 'CUBA' && zone.includes('HABANA'))
+    || (country === 'VENEZUELA' && ['CARACAS', 'VALENCIA'].includes(zone));
+};
+
 const reconcileOffices = (offices) => {
   const initialByKey = new Map(initialOfficesData.map((office) => [getOfficeKey(office), office]));
 
@@ -142,7 +148,9 @@ const reconcileOffices = (offices) => {
 export default function App() {
   const [activeTab, setActiveTab] = useState('resumen');
   const [filter, setFilter] = useState('Todas');
+  const [circunscriptionFilter, setCircunscriptionFilter] = useState('Todas');
   const [reportFilter, setReportFilter] = useState('Todas');
+  const [reportCircunscriptionFilter, setReportCircunscriptionFilter] = useState('Todas');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(2);
   const [selectedActaType, setSelectedActaType] = useState(null);
@@ -153,6 +161,10 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState(() => (
     getCachedSeguimiento() ? 'Datos locales; verificando sincronización...' : 'Cargando datos...'
   ));
+  const isSavingRef = useRef(false);
+  const saveQueueRef = useRef(Promise.resolve());
+  const saveSequenceRef = useRef(0);
+  const participatingOffices = offices.filter((office) => !isExcludedFromGeneralPercentage(office));
 
   useEffect(() => {
     let active = true;
@@ -161,9 +173,8 @@ export default function App() {
 
     const unsubscribe = subscribeToSeguimiento(
       (savedOffices) => {
-        if (active) {
+        if (active && !isSavingRef.current) {
           setOffices(reconcileOffices(savedOffices));
-          setSyncStatus('Sincronizado');
         }
       },
       (status) => {
@@ -188,7 +199,7 @@ export default function App() {
         } else if (cachedOffices) {
           await saveSeguimiento(reconcileOffices(cachedOffices));
         }
-        setSyncStatus('Sincronizado');
+        setSyncStatus('');
       } catch (error) {
         console.error('No se pudo cargar el seguimiento desde MongoDB.', error);
         if (active) {
@@ -208,71 +219,115 @@ export default function App() {
   }, []);
 
   const persistOffices = async (nextOffices, changedId, errorMessage) => {
+    const operationId = saveSequenceRef.current + 1;
+    saveSequenceRef.current = operationId;
+    isSavingRef.current = true;
     setOffices(nextOffices);
-    setSyncStatus('Guardando...');
+    setSyncStatus('');
 
-    try {
-      const result = await saveSeguimiento(nextOffices, [changedId]);
-      setOffices(reconcileOffices(result.offices));
-      setSyncStatus('Sincronizado');
-    } catch (error) {
-      console.error(errorMessage, error);
-      if (error.status === 409) {
-        try {
-          const currentOffices = await loadSeguimiento();
-          setOffices(reconcileOffices(currentOffices));
-          setSyncStatus('Se recargaron cambios centrales');
-        } catch (reloadError) {
-          console.error('No se pudo recargar la información central.', reloadError);
-          setSyncStatus('Error de sincronización');
+    const saveTask = saveQueueRef.current.then(async () => {
+      try {
+        const currentOffices = await loadSeguimiento();
+        const changedOffice = nextOffices.find((office) => office.id === changedId);
+        const currentOffice = currentOffices.find(
+          (office) => office.zoneCode === changedOffice?.zoneCode
+        );
+
+        if (!changedOffice || !currentOffice) {
+          throw new Error('No se encontró la oficina que se estaba actualizando.');
         }
-      } else {
-        setSyncStatus('Error al guardar');
+
+        const officesToSave = currentOffices.map((office) => (
+          office.zoneCode === changedOffice.zoneCode
+            ? { ...changedOffice, dataVersion: currentOffice.dataVersion, id: currentOffice.id }
+            : office
+        ));
+        const result = await saveSeguimiento(officesToSave, [currentOffice.id]);
+        if (operationId === saveSequenceRef.current) {
+          setOffices(reconcileOffices(result.offices));
+        }
+      } catch (error) {
+        console.error(errorMessage, error);
+        if (operationId !== saveSequenceRef.current) return;
+
+        if (error.status === 409) {
+          try {
+            const currentOffices = await loadSeguimiento();
+            setOffices(reconcileOffices(currentOffices));
+            setSyncStatus('Se recargaron cambios centrales');
+          } catch (reloadError) {
+            console.error('No se pudo recargar la información central.', reloadError);
+            setSyncStatus('Error de sincronización');
+          }
+        } else {
+          setSyncStatus('Error al guardar');
+        }
+      } finally {
+        if (operationId === saveSequenceRef.current) {
+          isSavingRef.current = false;
+        }
       }
-    }
+    });
+
+    saveQueueRef.current = saveTask.catch((error) => {
+      console.error('La cola de guardado no pudo continuar.', error);
+    });
+    await saveTask;
   };
 
   const filteredOffices = useMemo(() => {
-    return offices.filter((office) => {
+    return participatingOffices.filter((office) => {
       const matchesFilter = filter === 'Todas' || statusInfo[getOfficeStatus(office)].label === filter;
+      const matchesCircunscription = circunscriptionFilter === 'Todas'
+        || office.circunscription === circunscriptionFilter;
       const matchesSearch = `${office.name} ${office.country} ${office.zone} ${office.circunscription}`.toLowerCase().includes(search.toLowerCase());
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesCircunscription && matchesSearch;
     });
-  }, [offices, filter, search]);
+  }, [participatingOffices, filter, circunscriptionFilter, search]);
+
+  const circunscriptions = useMemo(() => (
+    [...new Set(participatingOffices.map((office) => office.circunscription).filter(Boolean))].sort()
+  ), [participatingOffices]);
 
   const reportOffices = useMemo(() => {
-    if (reportFilter === 'Todas') return offices;
-    return offices.filter((office) => statusInfo[getOfficeStatus(office)].label === reportFilter);
-  }, [offices, reportFilter]);
+    return participatingOffices.filter((office) => {
+      const matchesStatus = reportFilter === 'Todas'
+        || statusInfo[getOfficeStatus(office)].label === reportFilter;
+      const matchesCircunscription = reportCircunscriptionFilter === 'Todas'
+        || office.circunscription === reportCircunscriptionFilter;
+      return matchesStatus && matchesCircunscription;
+    });
+  }, [participatingOffices, reportFilter, reportCircunscriptionFilter]);
 
   const reportStatusCounts = useMemo(() => (
     Object.entries(statusInfo).map(([status, info]) => ({
       status,
       label: info.label,
-      count: offices.filter((office) => getOfficeStatus(office) === status).length,
+      count: participatingOffices.filter((office) => getOfficeStatus(office) === status).length,
     }))
-  ), [offices]);
+  ), [participatingOffices]);
 
   const stats = useMemo(() => {
-    const totalActs = offices.reduce((sum, office) => sum + office.juntas * 3, 0);
-    const digitizedActs = offices.reduce((sum, office) => sum + getDigitalizedScrutinyActs(office), 0);
+    const totalActs = participatingOffices.reduce((sum, office) => sum + office.juntas * 3, 0);
+    const digitizedActs = participatingOffices.reduce((sum, office) => sum + getDigitalizedScrutinyActs(office), 0);
 
     return {
-      total: offices.length,
-      completed: offices.filter((office) => getOfficeStatus(office) === 'finalizado').length,
-      average: offices.length
-        ? Math.round(offices.reduce((sum, office) => sum + getGeneralProgress(office), 0) / offices.length)
+      total: participatingOffices.length,
+      completed: participatingOffices.filter((office) => getOfficeStatus(office) === 'finalizado').length,
+      excludedGeneralPercentage: offices.filter(isExcludedFromGeneralPercentage).length,
+      average: participatingOffices.length
+        ? Math.round(participatingOffices.reduce((sum, office) => sum + getGeneralProgress(office), 0) / participatingOffices.length)
         : 0,
-      electors: offices.reduce((sum, office) => sum + office.electors, 0),
-      juntas: offices.reduce((sum, office) => sum + office.juntas, 0),
+      electors: participatingOffices.reduce((sum, office) => sum + office.electors, 0),
+      juntas: participatingOffices.reduce((sum, office) => sum + office.juntas, 0),
       totalActs,
-      digitizedZones: offices.filter(
+      digitizedZones: participatingOffices.filter(
         (office) => getDigitalizedScrutinyActs(office) === office.juntas * 3
       ).length,
       digitizedActs,
       digitizedActsProgress: totalActs ? Math.round((digitizedActs / totalActs) * 100) : 0,
     };
-  }, [offices]);
+  }, [offices, participatingOffices]);
 
   const updateMilestone = (id, milestoneId) => {
     const office = offices.find((item) => item.id === id);
@@ -422,7 +477,8 @@ export default function App() {
     );
   };
 
-  const selectedOffice = offices.find((office) => office.id === selectedId) || offices[0];
+  const selectedOffice = participatingOffices.find((office) => office.id === selectedId)
+    || participatingOffices[0];
 
   return (
     <div className="dashboard-container">
@@ -438,7 +494,7 @@ export default function App() {
           {activeTab === 'resumen' && (
             <>
               <OverviewCharts 
-                offices={offices} 
+                offices={participatingOffices} 
                 stats={stats} 
                 statusInfo={statusInfo} 
                 getOfficeStatus={getOfficeStatus} 
@@ -449,10 +505,13 @@ export default function App() {
           {/* Vista: ASIGNACIÓN / TABLA DE OFICINAS */}
           {activeTab === 'oficinas' && (
             <OfficesTable
-              offices={offices}
+              offices={participatingOffices}
               filteredOffices={filteredOffices}
               filter={filter}
               setFilter={setFilter}
+              circunscriptionFilter={circunscriptionFilter}
+              setCircunscriptionFilter={setCircunscriptionFilter}
+              circunscriptions={circunscriptions}
               search={search}
               setSearch={setSearch}
               selectedId={selectedId}
@@ -465,7 +524,7 @@ export default function App() {
           {/* Vista: MARCAR AVANCES */}
           {activeTab === 'avances' && (
             <MilestoneEditor
-              offices={offices}
+              offices={participatingOffices}
               selectedOffice={selectedOffice}
               selectedId={selectedId}
               setSelectedId={setSelectedId}
@@ -485,9 +544,25 @@ export default function App() {
           {activeTab === 'reportes' && (
             <div className="tab-view reports-container">
               <h2>Reportes de seguimiento</h2>
-              <p>Selecciona un estado para consultar y exportar únicamente las oficinas correspondientes.</p>
+              <p>Selecciona una circunscripción o estado para consultar y exportar únicamente las oficinas correspondientes.</p>
 
               <div className="filter-tabs report-filter-tabs">
+                <div className="report-circunscription-filter">
+                  <label htmlFor="report-circunscription-filter">Circunscripciones:</label>
+                  <select
+                    id="report-circunscription-filter"
+                    className="circunscription-select"
+                    value={reportCircunscriptionFilter}
+                    onChange={(event) => setReportCircunscriptionFilter(event.target.value)}
+                  >
+                    <option value="Todas">Todas las circunscripciones</option>
+                    {circunscriptions.map((circunscription) => (
+                      <option key={circunscription} value={circunscription}>
+                        {circunscription}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {['Todas', ...Object.values(statusInfo).map(({ label }) => label)].map((option) => (
                   <button
                     key={option}
@@ -502,9 +577,11 @@ export default function App() {
               <div className="report-total">
                 <strong>{reportOffices.length}</strong>
                 <span>
-                  {reportFilter === 'Todas'
-                    ? 'oficinas en total'
-                    : `oficinas con estado "${reportFilter}"`}
+                  {reportFilter !== 'Todas'
+                    ? `oficinas con estado "${reportFilter}"`
+                    : reportCircunscriptionFilter !== 'Todas'
+                      ? `oficinas de ${reportCircunscriptionFilter}`
+                      : 'oficinas en total'}
                 </span>
               </div>
 

@@ -7,14 +7,14 @@ export default function MetricsGrid({ stats }) {
         <span className="stat-icon">🏛️</span>
         <div className="metric-content">
           <h3>{stats.total}</h3>
-          <p>Total Oficinas Consulares</p>
+          <p>Total Zonas Electorales</p>
         </div>
       </div>
       <div className="stat-card">
         <span className="stat-icon">📈</span>
         <div className="metric-content">
           <h3>{stats.average}%</h3>
-          <p>Avance Global De Oficinas Consulares</p>
+          <p>Avance Global De Zonas Electorales</p>
         </div>
       </div>
       <div className="stat-card">
@@ -25,7 +25,7 @@ export default function MetricsGrid({ stats }) {
         </div>
       </div>
       <div className="stat-card">
-        <span className="stat-icon">👥</span>
+        <span className="stat-icon">📋</span>
         <div className="metric-content">
           <h3>{formatNumber(stats.totalActs)}</h3>
           <p>Actas de Escrutinio Totales</p>
@@ -43,7 +43,15 @@ export default function MetricsGrid({ stats }) {
         <span className="stat-icon">✅</span>
         <div className="metric-content">
           <h3>{stats.completed}</h3>
-          <p>Oficinas Finalizadas</p>
+          <p>Zonas Electorales Finalizadas</p>
+        </div>
+      </div>
+      <div className="stat-card">
+        <span className="stat-icon">🚫</span>
+        <div className="metric-content">
+          <h3>{stats.excludedGeneralPercentage}</h3>
+          <p>Zonas Electorales no participan</p>
+          <small className="metric-detail">La Habana, Caracas y Valencia</small>
         </div>
       </div>
     </div>

@@ -1,11 +1,9 @@
 export const statusInfo = {
-  sinEmpezar: { label: 'Sin empezar', color: '#94a3b8', icon: '○' },
-  instalacion: { label: 'Instalación de MJRV', color: '#f59e0b', icon: '🛠' },
-  inicio: { label: 'Inicio de votación', color: '#3b82f6', icon: '◷' },
-  cierre: { label: 'Fin de votación', color: '#e11d48', icon: '▣' },
-  escrutinio: { label: 'Inicio de escrutinio', color: '#b3b46a', icon: '📊' }, // Estado intermedio crítico del flujo electoral
+  sinEmpezar: { label: 'Sin instalar', color: '#94a3b8', icon: '○' },
+  instalacion: { label: 'Instalación e inicio del sufragio', color: '#f59e0b', icon: '🛠' },
+  cierre: { label: 'Fin del sufragio e inicio del escrutinio', color: '#e11d48', icon: '▣' },
   digitalizacion: { label: 'Digitalización de actas', color: '#8b5cf6', icon: '▤' },
-  finalizado: { label: 'Finalizado', color: '#10b981', icon: '✓' },
+  finalizado: { label: 'Proceso finalizado', color: '#10b981', icon: '✓' },
 };
 
 export const milestones = [

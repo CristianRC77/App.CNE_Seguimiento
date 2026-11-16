@@ -1,7 +1,7 @@
 export default function DashboardHeader({ activeTab }) {
   const titles = {
     resumen: 'Resumen General del Proceso',
-    oficinas: 'Avances de Oficinas Consulares',
+    oficinas: 'Avances de Zonas Electorales',
     avances: 'Registro de Hitos Electorales',
     reportes: 'Reportes Electorales',
   };

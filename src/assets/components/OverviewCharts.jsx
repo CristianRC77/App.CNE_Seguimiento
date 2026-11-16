@@ -7,24 +7,29 @@ const formatUpdatedAt = (value) => new Intl.DateTimeFormat('es-EC', {
   timeStyle: 'short',
 }).format(value);
 
-const getWholePercentages = (counts, total) => {
-  if (!total) return counts.map(() => 0);
+const getCumulativeStatuses = (statuses, total) => {
+  let cumulativeCount = 0;
 
-  const percentages = counts.map((count) => {
-    const exact = (count / total) * 100;
-    return { value: Math.floor(exact), remainder: exact - Math.floor(exact) };
-  });
-  let pointsToDistribute = 100 - percentages.reduce((sum, item) => sum + item.value, 0);
+  const cumulativeStatuses = statuses.reduceRight((result, status) => {
+    cumulativeCount += status.count;
 
-  percentages
-    .map((item, index) => ({ ...item, index }))
-    .sort((a, b) => b.remainder - a.remainder)
-    .slice(0, pointsToDistribute)
-    .forEach(({ index }) => {
-      percentages[index].value += 1;
+    result.unshift({
+      ...status,
+      count: cumulativeCount,
+      percentage: total ? Math.round((cumulativeCount / total) * 100) : 0,
     });
+    return result;
+  }, []);
 
-  return percentages.map((item) => item.value);
+  if (!statuses.length) return cumulativeStatuses;
+
+  cumulativeStatuses[0] = {
+    ...cumulativeStatuses[0],
+    count: statuses[0].count,
+    percentage: total ? Math.round((statuses[0].count / total) * 100) : 0,
+  };
+
+  return cumulativeStatuses;
 };
 
 const getActaProgress = (offices) => {
@@ -62,14 +67,13 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const statusCounts = Object.keys(statusInfo).map((status) => ({
+  const statusCounts = getCumulativeStatuses(Object.keys(statusInfo).map((status) => ({
+    status,
     ...statusInfo[status],
     count: offices.filter((office) => getOfficeStatus(office) === status).length,
-  }));
-  const wholePercentages = getWholePercentages(
-    statusCounts.map((item) => item.count),
-    offices.length
-  );
+  })), offices.length);
+  const notStartedCount = offices.filter((office) => getOfficeStatus(office) === 'sinEmpezar').length;
+  const startedCount = offices.length - notStartedCount;
   const circunscriptionOrder = [
     'EUROPA, OCEANÍA Y ASIA',
     'CANADÁ Y ESTADOS UNIDOS',
@@ -85,22 +89,19 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
     .map((circunscription) => {
       const circunscriptionOffices = offices
         .filter((office) => office.circunscription === circunscription);
-      const statusItems = Object.keys(statusInfo).map((status) => ({
+      const statusItems = getCumulativeStatuses(Object.keys(statusInfo).map((status) => ({
         status,
         ...statusInfo[status],
         count: circunscriptionOffices
           .filter((office) => getOfficeStatus(office) === status)
           .length,
-      }));
+      })), circunscriptionOffices.length);
 
       return {
         circunscription,
+        officeCount: circunscriptionOffices.length,
         ...getActaProgress(circunscriptionOffices),
         statuses: statusItems,
-        statusPercentages: getWholePercentages(
-          statusItems.map((item) => item.count),
-          circunscriptionOffices.length
-        ),
       };
     });
   const totalActasProgress = getActaProgress(offices);
@@ -113,25 +114,37 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
           <div>
             <h2>Avance general</h2>
             <p>Porcentaje ponderado según electores</p>
+            <p>Faltan {formatNumber(notStartedCount)} por empezar y {formatNumber(startedCount)} empezadas de {formatNumber(offices.length)}</p>
           </div>
         </div>
         <div className="progress-content">
           <div className="donut" style={{ '--percent': `${stats.average * 3.6}deg` }}>
             <div>
               <strong>{stats.average}%</strong>
-              <span>Electores cubiertos</span>
+              <span>zonas consulares</span>
             </div>
           </div>
           <div className="legend">
-            {statusCounts.map((item, index) => (
+            {statusCounts.map((item) => (
               <div className="legend-row" key={item.label}>
                 <span className="legend-label">
                   <i style={{ backgroundColor: item.color }} />
                   {item.label}
                 </span>
                 <b className="legend-value">
-                  {item.count}/{offices.length}
-                  <small>{wholePercentages[index]}%</small>
+                  {item.status === 'sinEmpezar'
+                    ? (
+                      <>
+                        De <strong className="legend-highlight">{formatNumber(offices.length)}</strong>
+                        Pendiente <strong className="legend-highlight">{formatNumber(item.count)}</strong>
+                      </>
+                    )
+                    : (
+                      <>
+                        {item.count} / {offices.length}
+                        <small>{item.percentage}%</small>
+                      </>
+                    )}
                 </b>
               </div>
             ))}
@@ -169,12 +182,16 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
                 <span>{formatNumber(item.total)} totales</span>
               </div>
               <div className="circunscription-status-list">
-                {item.statuses.map((status, index) => (
+                {item.statuses.map((status) => (
                   <span className="circunscription-status" key={status.status}>
                     <i style={{ backgroundColor: status.color }} />
                     <span>{status.label}</span>
-                    <b>{status.count}</b>
-                    <small>{item.statusPercentages[index]}%</small>
+                    <b>
+                      {status.status === 'sinEmpezar'
+                        ? `De ${formatNumber(item.officeCount)}, pendiente ${formatNumber(status.count)}`
+                        : status.count}
+                    </b>
+                    {status.status !== 'sinEmpezar' && <small>{status.percentage}%</small>}
                   </span>
                 ))}
               </div>

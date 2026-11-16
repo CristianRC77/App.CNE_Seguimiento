@@ -4,6 +4,9 @@ export default function OfficesTable({
   filteredOffices, 
   filter, 
   setFilter, 
+  circunscriptionFilter,
+  setCircunscriptionFilter,
+  circunscriptions,
   search, 
   setSearch, 
   selectedId, 
@@ -14,13 +17,35 @@ export default function OfficesTable({
   return (
     <div className="tab-view table-section">
       <div className="table-controls">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar por oficina, país o zona..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="table-input-filters">
+          <div className="table-filter-group">
+            <label htmlFor="circunscription-filter">Circunscripciones:</label>
+            <select
+              id="circunscription-filter"
+              className="circunscription-select table-circunscription-filter"
+              value={circunscriptionFilter}
+              onChange={(e) => setCircunscriptionFilter(e.target.value)}
+            >
+              <option value="Todas">Todas las circunscripciones</option>
+              {circunscriptions.map((circunscription) => (
+                <option key={circunscription} value={circunscription}>
+                  {circunscription}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="table-filter-group">
+            <label htmlFor="office-search">Buscar por:</label>
+            <input
+              id="office-search"
+              type="text"
+              className="search-input"
+              placeholder="Oficina, país o zona..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="filter-tabs">
           {['Todas', ...Object.values(statusInfo).map(({ label }) => label)].map((tab) => (
             <button
