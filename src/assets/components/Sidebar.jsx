@@ -23,7 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           className={`nav-item ${activeTab === 'oficinas' ? 'active' : ''}`} 
           onClick={() => setActiveTab('oficinas')}
         >
-          🏛️ Avance de Zonas Elecorales
+          🏛️ Avance de Zonas Electorales
         </button>
         <button 
           className={`nav-item ${activeTab === 'avances' ? 'active' : ''}`} 
