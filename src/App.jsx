@@ -379,7 +379,23 @@ export default function App() {
 
           // Paso 2: Cargar datos actuales del servidor (con token válido)
           console.log('Cargando datos actuales del servidor...');
-          const currentOffices = await loadSeguimiento();
+          let currentOffices;
+          try {
+            currentOffices = await loadSeguimiento();
+          } catch (loadError) {
+            // Si falla al cargar, intenta refrescar y recargar
+            if (loadError.status === 401) {
+              console.warn('Error 401 al cargar datos, refrescando token...');
+              const refreshed = await refreshAuthToken();
+              if (refreshed) {
+                currentOffices = await loadSeguimiento();
+              } else {
+                throw loadError;
+              }
+            } else {
+              throw loadError;
+            }
+          }
           
           // Paso 3: Encontrar la oficina modificada
           const changedOffice = nextOffices.find((office) => office.id === changedId);
@@ -406,9 +422,18 @@ export default function App() {
               : office
           ));
 
-          // Paso 5: Guardar solo la zona modificada
+          // Paso 5: Guardar solo la zona modificada (con timeout de 30 segundos)
           console.log(`Guardando cambios en el servidor...`);
-          const result = await saveSeguimiento(officesToSave, [changedOffice.zoneCode]);
+          
+          // Crear promesa con timeout
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout al guardar (30s)')), 30000)
+          );
+          
+          const result = await Promise.race([
+            saveSeguimiento(officesToSave, [changedOffice.zoneCode]),
+            timeoutPromise,
+          ]);
 
           // Paso 6: Validar respuesta del servidor
           if (!result.offices || !Array.isArray(result.offices)) {
@@ -435,22 +460,32 @@ export default function App() {
 
           // Manejar diferentes tipos de errores
           if (error.status === 401) {
-            // Token expirado o inválido
+            // Token expirado o inválido - NUNCA cierre sesión sin intentar refrescar primero
+            console.warn(`⚠️  Error 401 recibido`);
+            
             if (retryCount < maxRetries) {
               console.log(
-                `Error 401 (sesión expirada), intento ${retryCount + 1}/${maxRetries}...`
+                `Intento ${retryCount + 1}/${maxRetries}: Refrescando token...`
               );
               retryCount++;
               try {
+                // Siempre intenta refrescar el token
                 const refreshed = await refreshAuthToken();
                 if (refreshed) {
-                  console.log('Token refrescado en manejo de error, reintentando...');
+                  console.log('✅ Token refrescado, reintentando guardado...');
                   return attemptSave();
+                } else {
+                  console.warn('❌ No se pudo refrescar el token');
                 }
               } catch (refreshError) {
-                console.error('No se pudo refrescar en manejo de error.', refreshError);
+                console.error('Error al refrescar token:', refreshError);
               }
+            } else {
+              console.error(`❌ Se agotaron los ${maxRetries} reintentos de refresh`);
             }
+            
+            // SOLO cierra sesión después de agotar reintentos
+            console.error('Cerrando sesión...');
             handleLogout();
             setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
           } else if (error.status === 403) {
