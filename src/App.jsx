@@ -1,14 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { initialOfficesData } from './assets/data/initialOffices';
-import { statusInfo, milestones } from './assets/constants/cneConstants';
+import {
+  normalizeCircunscription,
+  getCompletionPercentage,
+  statusInfo,
+  milestones,
+  USER_ROLES,
+} from './assets/constants/cneConstants';
 import {
   getCachedSeguimiento,
   loadSeguimiento,
   saveSeguimiento,
   subscribeToSeguimiento,
 } from './assets/data/seguimientoService';
+import {
+  getStoredAuthSession,
+  logout,
+  getTokenExpirationTime,
+  refreshAuthToken,
+  getAuthToken,
+  isTokenExpiringsoon,
+} from './assets/data/authService';
 import { exportOfficesToCSV } from './assets/utils/exportUtils';
 import Sidebar from './assets/components/Sidebar';
+import LoginModal from './assets/components/LoginModal';
 import DashboardHeader from './assets/components/DashboardHeader';
 import MetricsGrid from './assets/components/MetricsGrid';
 import OverviewCharts from './assets/components/OverviewCharts';
@@ -16,6 +31,7 @@ import OfficesTable from './assets/components/OfficesTable';
 import MilestoneEditor from './assets/components/MilestoneEditor';
 import './App.css';
 
+// Determina el estado visual de una zona a partir de sus hitos y actas.
 const getOfficeStatus = (office) => {
   const completed = Object.values(office.milestones || {}).filter(Boolean).length;
   if (completed >= 6 && areActasComplete(office, 'escrutinio') && areActasComplete(office, 'instalacion')) {
@@ -27,6 +43,7 @@ const getOfficeStatus = (office) => {
   return 'instalacion';
 };
 
+// Cuenta las actas de escrutinio marcadas para hombres y mujeres.
 const getDigitalizedScrutinyActs = (office) => {
   const scrutinyActs = office.actasDigitalizadas?.escrutinio || {};
   return [...(scrutinyActs.hombres || []), ...(scrutinyActs.mujeres || [])]
@@ -34,6 +51,7 @@ const getDigitalizedScrutinyActs = (office) => {
     .length;
 };
 
+// Cuenta las actas de instalación que ya fueron digitalizadas.
 const getDigitalizedInstallationActs = (office) => {
   const installationActs = office.actasDigitalizadas?.instalacion || {};
   return [...(installationActs.hombres || []), ...(installationActs.mujeres || [])]
@@ -41,6 +59,7 @@ const getDigitalizedInstallationActs = (office) => {
     .length;
 };
 
+// Calcula el total esperado de actas: tres de escrutinio y una de instalación por junta.
 const getTotalActas = (office, type) => {
   const multiplier = type === 'escrutinio' ? 3 : 1;
   return (office.juntasMen + office.juntasWomen) * multiplier;
@@ -58,11 +77,23 @@ const getGeneralProgress = (office) => {
     : 0;
   const completedBeforeDigitalization = Math.min(completedMilestones, 4);
 
-  return Math.round((
+  // El avance combina hitos y digitalización de actas de instalación y escrutinio.
+  const calculatedProgress = Math.round((
     completedBeforeDigitalization + scrutinyProgress + installationProgress
   ) / milestones.length * 100);
+  const allMilestonesComplete = milestones.every(
+    (milestone) => office.milestones?.[milestone.id]
+  );
+  const allActsComplete = areActasComplete(office, 'escrutinio')
+    && areActasComplete(office, 'instalacion');
+
+  // El redondeo nunca puede ocultar un hito o acta pendiente.
+  return calculatedProgress >= 100 && (!allMilestonesComplete || !allActsComplete)
+    ? 99
+    : calculatedProgress;
 };
 
+// Indica si todas las actas de un tipo fueron digitalizadas.
 const areActasComplete = (office, type) => {
   const totalActas = getTotalActas(office, type);
   const digitalizedActas = type === 'escrutinio'
@@ -71,15 +102,15 @@ const areActasComplete = (office, type) => {
   return totalActas > 0 && digitalizedActas === totalActas;
 };
 
+// Prepara los datos locales de respaldo cuando la API todavía no está disponible.
 const createInitialOffices = () => initialOfficesData.map((office) => ({
   ...office,
   actasDigitalizadas: {
     escrutinio: { hombres: [], mujeres: [] },
     instalacion: { hombres: [], mujeres: [] },
   },
-  milestones: milestones.reduce((result, milestone, index) => {
-    result[milestone.id] = office.progress === 100
-      || index < Math.ceil((office.progress / 100) * milestones.length);
+  milestones: milestones.reduce((result, milestone) => {
+    result[milestone.id] = false;
     return result;
   }, {}),
 }));
@@ -90,6 +121,7 @@ const normalizeActas = (office) => {
     const totalHombres = office.juntasMen * multiplier;
     const totalMujeres = office.juntasWomen * multiplier;
 
+    // Siempre se crean arreglos del tamaño esperado, incluso si MongoDB no tiene datos.
     return {
       hombres: Array.from({ length: totalHombres }, (_, index) => Boolean(savedActas.hombres?.[index])),
       mujeres: Array.from({ length: totalMujeres }, (_, index) => Boolean(savedActas.mujeres?.[index])),
@@ -102,16 +134,18 @@ const normalizeActas = (office) => {
   };
 };
 
+// Completa campos faltantes y recalcula el avance antes de guardar en el estado de React.
 const normalizeOffices = (offices) => offices.map((office) => {
   const actasDigitalizadas = normalizeActas(office);
-  const normalizedMilestones = milestones.reduce((result, milestone, index) => {
-    result[milestone.id] = Boolean(
-      office.milestones?.[milestone.id]
-      ?? (office.progress === 100 || index < Math.ceil((office.progress / 100) * milestones.length))
-    );
+  
+  // Los hitos son la fuente de verdad. Solo usamos el campo del servidor si existe.
+  // No usamos office.progress para determinar hitos - progress se calcula DESDE los hitos.
+  const normalizedMilestones = milestones.reduce((result, milestone) => {
+    result[milestone.id] = Boolean(office.milestones?.[milestone.id]);
     return result;
   }, {});
 
+  // Marcar hitos de digitalización basado en actas completadas
   normalizedMilestones.digitalizacionEscrutinio = areActasComplete(
     { ...office, actasDigitalizadas },
     'escrutinio'
@@ -131,13 +165,30 @@ const isExcludedFromGeneralPercentage = (office) => {
   const country = String(office.country || '').trim().toUpperCase();
   const zone = String(office.zone || '').trim().toUpperCase();
 
+  // Estas zonas siguen existiendo en la base de datos, pero no participan
+  // en los indicadores generales ni en los listados operativos.
   return (country === 'CUBA' && zone.includes('HABANA'))
     || (country === 'VENEZUELA' && ['CARACAS', 'VALENCIA'].includes(zone));
+};
+
+// Un reporte de una etapa incluye también las zonas que ya avanzaron a etapas posteriores.
+const matchesReportStatus = (office, selectedLabel) => {
+  if (selectedLabel === 'Todas') return true;
+
+  const statusOrder = Object.keys(statusInfo);
+  const selectedStatus = statusOrder.find((status) => statusInfo[status].label === selectedLabel);
+  const currentStatus = getOfficeStatus(office);
+
+  if (!selectedStatus) return false;
+  if (selectedStatus === 'sinEmpezar') return currentStatus === selectedStatus;
+
+  return statusOrder.indexOf(currentStatus) >= statusOrder.indexOf(selectedStatus);
 };
 
 const reconcileOffices = (offices) => {
   const initialByKey = new Map(initialOfficesData.map((office) => [getOfficeKey(office), office]));
 
+  // Conserva datos locales complementarios y reemplaza los valores con los del servidor.
   return normalizeOffices(offices.map((office, index) => ({
     ...(initialByKey.get(getOfficeKey(office)) || {}),
     ...office,
@@ -146,7 +197,10 @@ const reconcileOffices = (offices) => {
 };
 
 export default function App() {
+  // Estos estados controlan la pestaña activa, filtros, selección y sincronización.
   const [activeTab, setActiveTab] = useState('resumen');
+  const [authSession, setAuthSession] = useState(getStoredAuthSession);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [filter, setFilter] = useState('Todas');
   const [circunscriptionFilter, setCircunscriptionFilter] = useState('Todas');
   const [reportFilter, setReportFilter] = useState('Todas');
@@ -164,13 +218,43 @@ export default function App() {
   const isSavingRef = useRef(false);
   const saveQueueRef = useRef(Promise.resolve());
   const saveSequenceRef = useRef(0);
+  // La fuente completa se conserva, pero esta lista alimenta las vistas operativas.
   const participatingOffices = offices.filter((office) => !isExcludedFromGeneralPercentage(office));
+  const editableOffices = authSession?.user.rol === USER_ROLES.GENERAL
+    ? participatingOffices
+    : participatingOffices.filter((office) => (
+      normalizeCircunscription(office.circunscription)
+      === normalizeCircunscription(authSession?.user.circunscripcion)
+    ));
+
+  const handleProtectedTabClick = () => {
+    if (!authSession) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setActiveTab('avances');
+  };
+
+  const handleLoginSuccess = (session) => {
+    setAuthSession(session);
+    setIsLoginModalOpen(false);
+    setActiveTab('avances');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setAuthSession(null);
+    setIsLoginModalOpen(false);
+    setSelectedActaType(null);
+    setActiveTab('resumen');
+  };
 
   useEffect(() => {
     let active = true;
 
     const cachedOffices = getCachedSeguimiento();
 
+    // El polling mantiene la pantalla actualizada cuando otro usuario guarda cambios.
     const unsubscribe = subscribeToSeguimiento(
       (savedOffices) => {
         if (active && !isSavingRef.current) {
@@ -190,6 +274,7 @@ export default function App() {
       }
     );
 
+    // Carga el estado central al iniciar y usa la caché como respaldo si falla la API.
     const loadData = async () => {
       try {
         const savedOffices = await loadSeguimiento();
@@ -218,55 +303,181 @@ export default function App() {
     };
   }, []);
 
+  // Monitorea la expiración del token y lo refresca automáticamente 15 minutos antes de expirar.
+  useEffect(() => {
+    if (!authSession?.token) return;
+
+    let refreshTimer;
+
+    const scheduleTokenRefresh = () => {
+      const expirationTime = getTokenExpirationTime(authSession.token);
+      if (!expirationTime) return;
+
+      // Calcula cuándo hacer refresh: 15 minutos antes de la expiración
+      const refreshTime = expirationTime - (15 * 60 * 1000);
+      const now = Date.now();
+      const msUntilRefresh = refreshTime - now;
+
+      if (msUntilRefresh <= 0) {
+        // El token está por expirar en menos de 15 minutos, refresca ahora
+        void refreshAuthToken();
+        // Vuelve a programar el refresh en 1 minuto
+        refreshTimer = setTimeout(() => scheduleTokenRefresh(), 60000);
+      } else {
+        // Programa el refresh para más tarde
+        refreshTimer = setTimeout(async () => {
+          const success = await refreshAuthToken();
+          if (success) {
+            // Si se renovó exitosamente, vuelve a programar
+            scheduleTokenRefresh();
+          } else {
+            // Si falló, intenta de nuevo en 1 minuto
+            refreshTimer = setTimeout(() => scheduleTokenRefresh(), 60000);
+          }
+        }, msUntilRefresh);
+      }
+    };
+
+    scheduleTokenRefresh();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
+  }, [authSession?.token]);
+
+  // Guarda una modificación y evita perder cambios concurrentes usando dataVersion.
   const persistOffices = async (nextOffices, changedId, errorMessage) => {
     const operationId = saveSequenceRef.current + 1;
     saveSequenceRef.current = operationId;
     isSavingRef.current = true;
     setOffices(nextOffices);
-    setSyncStatus('');
+    setSyncStatus('Guardando...');
 
+    // Las escrituras se serializan para evitar conflictos entre cambios rápidos.
     const saveTask = saveQueueRef.current.then(async () => {
-      try {
-        const currentOffices = await loadSeguimiento();
-        const changedOffice = nextOffices.find((office) => office.id === changedId);
-        const currentOffice = currentOffices.find(
-          (office) => office.zoneCode === changedOffice?.zoneCode
-        );
+      let retryCount = 0;
+      const maxRetries = 2;
 
-        if (!changedOffice || !currentOffice) {
-          throw new Error('No se encontró la oficina que se estaba actualizando.');
-        }
-
-        const officesToSave = currentOffices.map((office) => (
-          office.zoneCode === changedOffice.zoneCode
-            ? { ...changedOffice, dataVersion: currentOffice.dataVersion, id: currentOffice.id }
-            : office
-        ));
-        const result = await saveSeguimiento(officesToSave, [currentOffice.id]);
-        if (operationId === saveSequenceRef.current) {
-          setOffices(reconcileOffices(result.offices));
-        }
-      } catch (error) {
-        console.error(errorMessage, error);
-        if (operationId !== saveSequenceRef.current) return;
-
-        if (error.status === 409) {
-          try {
-            const currentOffices = await loadSeguimiento();
-            setOffices(reconcileOffices(currentOffices));
-            setSyncStatus('Se recargaron cambios centrales');
-          } catch (reloadError) {
-            console.error('No se pudo recargar la información central.', reloadError);
-            setSyncStatus('Error de sincronización');
+      const attemptSave = async () => {
+        try {
+          // Paso 1: Asegurar que el token es válido
+          let currentToken = getAuthToken();
+          if (!currentToken) {
+            throw new Error('No hay sesión activa.');
           }
-        } else {
-          setSyncStatus('Error al guardar');
+
+          // Si el token está por expirar o ya expiró, refresca ANTES de cualquier operación
+          if (isTokenExpiringsoon(currentToken)) {
+            console.log('Token por expirar, refrescando antes de guardar...');
+            const refreshed = await refreshAuthToken();
+            if (!refreshed) {
+              throw new Error('No se pudo refrescar el token.');
+            }
+            currentToken = getAuthToken();
+            console.log('Token refrescado exitosamente.');
+          }
+
+          // Paso 2: Cargar datos actuales del servidor (con token válido)
+          console.log('Cargando datos actuales del servidor...');
+          const currentOffices = await loadSeguimiento();
+          
+          // Paso 3: Encontrar la oficina modificada
+          const changedOffice = nextOffices.find((office) => office.id === changedId);
+          const currentOffice = currentOffices.find(
+            (office) => office.zoneCode === changedOffice?.zoneCode
+          );
+
+          if (!changedOffice || !currentOffice) {
+            throw new Error(
+              `No se encontró la oficina (ID: ${changedId}, Zona: ${changedOffice?.zoneCode}). `
+              + 'Puede haber sido eliminada por otro usuario.'
+            );
+          }
+
+          console.log(
+            `Preparando guardado para zona ${changedOffice.zoneCode} `
+            + `(versión: ${currentOffice.dataVersion} → ${currentOffice.dataVersion + 1})`
+          );
+
+          // Paso 4: Preparar datos para guardar (mantener dataVersion del servidor)
+          const officesToSave = currentOffices.map((office) => (
+            office.zoneCode === changedOffice.zoneCode
+              ? { ...changedOffice, dataVersion: currentOffice.dataVersion, id: currentOffice.id }
+              : office
+          ));
+
+          // Paso 5: Guardar solo la zona modificada
+          console.log(`Guardando cambios en el servidor...`);
+          const result = await saveSeguimiento(officesToSave, [changedOffice.zoneCode]);
+
+          // Paso 6: Validar respuesta del servidor
+          if (!result.offices || !Array.isArray(result.offices)) {
+            throw new Error('El servidor devolvió una respuesta inválida.');
+          }
+
+          // Paso 7: Actualizar estado local si esta operación sigue siendo la actual
+          if (operationId === saveSequenceRef.current) {
+            setOffices(reconcileOffices(result.offices));
+            setSyncStatus('Guardado correctamente');
+            console.log(
+              `✅ Guardado exitoso para zona ${changedOffice.zoneCode}. `
+              + `${result.updated} zona(s) actualizada(s).`
+            );
+          } else {
+            console.log('Esta operación fue cancelada por una más reciente.');
+          }
+        } catch (error) {
+          console.error(errorMessage, error);
+          if (operationId !== saveSequenceRef.current) {
+            console.log('Error en operación cancelada, ignorando.');
+            return;
+          }
+
+          // Manejar diferentes tipos de errores
+          if (error.status === 401) {
+            // Token expirado o inválido
+            if (retryCount < maxRetries) {
+              console.log(
+                `Error 401 (sesión expirada), intento ${retryCount + 1}/${maxRetries}...`
+              );
+              retryCount++;
+              try {
+                const refreshed = await refreshAuthToken();
+                if (refreshed) {
+                  console.log('Token refrescado en manejo de error, reintentando...');
+                  return attemptSave();
+                }
+              } catch (refreshError) {
+                console.error('No se pudo refrescar en manejo de error.', refreshError);
+              }
+            }
+            handleLogout();
+            setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
+          } else if (error.status === 403) {
+            setSyncStatus('No tienes permisos para modificar esta circunscripción.');
+          } else if (error.status === 409) {
+            // Conflicto: datos modificados por otro usuario
+            console.log('Conflicto detectado: datos modificados por otro usuario.');
+            try {
+              const currentOffices = await loadSeguimiento();
+              setOffices(reconcileOffices(currentOffices));
+              setSyncStatus('Se recargaron cambios centrales (actualizado por otro usuario)');
+            } catch (reloadError) {
+              console.error('No se pudo recargar después de conflicto.', reloadError);
+              setSyncStatus('Error al sincronizar conflicto');
+            }
+          } else {
+            // Otros errores
+            setSyncStatus(`Error al guardar: ${error.message}`);
+          }
+        } finally {
+          if (operationId === saveSequenceRef.current) {
+            isSavingRef.current = false;
+          }
         }
-      } finally {
-        if (operationId === saveSequenceRef.current) {
-          isSavingRef.current = false;
-        }
-      }
+      };
+
+      return attemptSave();
     });
 
     saveQueueRef.current = saveTask.catch((error) => {
@@ -276,6 +487,7 @@ export default function App() {
   };
 
   const filteredOffices = useMemo(() => {
+    // Los filtros se aplican sobre las zonas participantes, no sobre las excluidas.
     return participatingOffices.filter((office) => {
       const matchesFilter = filter === 'Todas' || statusInfo[getOfficeStatus(office)].label === filter;
       const matchesCircunscription = circunscriptionFilter === 'Todas'
@@ -289,10 +501,10 @@ export default function App() {
     [...new Set(participatingOffices.map((office) => office.circunscription).filter(Boolean))].sort()
   ), [participatingOffices]);
 
+  // Aplica los filtros independientes de la vista de reportes.
   const reportOffices = useMemo(() => {
     return participatingOffices.filter((office) => {
-      const matchesStatus = reportFilter === 'Todas'
-        || statusInfo[getOfficeStatus(office)].label === reportFilter;
+      const matchesStatus = matchesReportStatus(office, reportFilter);
       const matchesCircunscription = reportCircunscriptionFilter === 'Todas'
         || office.circunscription === reportCircunscriptionFilter;
       return matchesStatus && matchesCircunscription;
@@ -303,13 +515,31 @@ export default function App() {
     Object.entries(statusInfo).map(([status, info]) => ({
       status,
       label: info.label,
-      count: participatingOffices.filter((office) => getOfficeStatus(office) === status).length,
+      count: reportOffices.filter((office) => getOfficeStatus(office) === status).length,
     }))
-  ), [participatingOffices]);
+  ), [reportOffices]);
 
+  // Centraliza las métricas que se muestran en las tarjetas y gráficos.
   const stats = useMemo(() => {
-    const totalActs = participatingOffices.reduce((sum, office) => sum + office.juntas * 3, 0);
-    const digitizedActs = participatingOffices.reduce((sum, office) => sum + getDigitalizedScrutinyActs(office), 0);
+    // Escrutinio tiene tres actas por junta; instalación tiene una por junta.
+    const totalScrutinyActs = participatingOffices.reduce(
+      (sum, office) => sum + getTotalActas(office, 'escrutinio'),
+      0
+    );
+    const totalInstallationActs = participatingOffices.reduce(
+      (sum, office) => sum + getTotalActas(office, 'instalacion'),
+      0
+    );
+    const digitizedActs = participatingOffices.reduce(
+      (sum, office) => sum + getDigitalizedScrutinyActs(office),
+      0
+    );
+    const digitizedInstallationActs = participatingOffices.reduce(
+      (sum, office) => sum + getDigitalizedInstallationActs(office),
+      0
+    );
+    // El total general incluye ambos tipos; no se usa como denominador de un tipo.
+    const totalActs = totalScrutinyActs + totalInstallationActs;
 
     return {
       total: participatingOffices.length,
@@ -320,15 +550,23 @@ export default function App() {
         : 0,
       electors: participatingOffices.reduce((sum, office) => sum + office.electors, 0),
       juntas: participatingOffices.reduce((sum, office) => sum + office.juntas, 0),
+      totalScrutinyActs,
       totalActs,
+      totalInstallationActs,
       digitizedZones: participatingOffices.filter(
         (office) => getDigitalizedScrutinyActs(office) === office.juntas * 3
       ).length,
       digitizedActs,
-      digitizedActsProgress: totalActs ? Math.round((digitizedActs / totalActs) * 100) : 0,
+      digitizedActsProgress: getCompletionPercentage(digitizedActs, totalScrutinyActs),
+      digitizedInstallationActs,
+      installationActsProgress: getCompletionPercentage(
+        digitizedInstallationActs,
+        totalInstallationActs
+      ),
     };
   }, [offices, participatingOffices]);
 
+  // Marca o desmarca un hito respetando el orden del proceso electoral.
   const updateMilestone = (id, milestoneId) => {
     const office = offices.find((item) => item.id === id);
     if (!office) return;
@@ -370,6 +608,7 @@ export default function App() {
     );
   };
 
+  // Cambia una sola acta y actualiza el hito de digitalización correspondiente.
   const updateActa = (id, actaType, gender, actaIndex) => {
     const nextOffices = offices.map((office) => {
       if (office.id !== id) return office;
@@ -409,6 +648,7 @@ export default function App() {
     );
   };
 
+  // Marca en una sola operación todas las actas de una zona y tipo.
   const markAllActas = (id, actaType) => {
     const nextOffices = offices.map((office) => {
       if (office.id !== id) return office;
@@ -443,6 +683,7 @@ export default function App() {
     );
   };
 
+  // Revierte la digitalización masiva de actas para permitir correcciones.
   const unmarkAllActas = (id, actaType) => {
     const nextOffices = offices.map((office) => {
       if (office.id !== id) return office;
@@ -477,24 +718,32 @@ export default function App() {
     );
   };
 
-  const selectedOffice = participatingOffices.find((office) => office.id === selectedId)
-    || participatingOffices[0];
+  // Si la selección deja de existir, se muestra la primera zona disponible.
+  const selectedOffice = editableOffices.find((office) => office.id === selectedId)
+    || editableOffices[0];
 
   return (
     <div className="dashboard-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onProtectedTabClick={handleProtectedTabClick}
+        authSession={authSession}
+        onLogout={handleLogout}
+      />
 
       <main className="main-content">
         <DashboardHeader activeTab={activeTab} />
         <MetricsGrid stats={stats} />
 
+        {/* Informa al usuario si los datos están cargando, sincronizados o guardados localmente. */}
         {syncStatus && <div className="sync-status" role="status">{syncStatus}</div>}
         <section className="content-body">
           {/* Vista: RESUMEN GENERAL */}
           {activeTab === 'resumen' && (
             <>
               <OverviewCharts 
-                offices={participatingOffices} 
+                offices={participatingOffices}
                 stats={stats} 
                 statusInfo={statusInfo} 
                 getOfficeStatus={getOfficeStatus} 
@@ -523,29 +772,37 @@ export default function App() {
 
           {/* Vista: MARCAR AVANCES */}
           {activeTab === 'avances' && (
-            <MilestoneEditor
-              offices={participatingOffices}
-              selectedOffice={selectedOffice}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              selectedActaType={selectedActaType}
-              setSelectedActaType={setSelectedActaType}
-              milestones={milestones}
-              updateMilestone={updateMilestone}
-              updateActa={updateActa}
-              markAllActas={markAllActas}
-              unmarkAllActas={unmarkAllActas}
-              getOfficeStatus={getOfficeStatus}
-              statusInfo={statusInfo}
-            />
+            authSession && selectedOffice ? (
+              <MilestoneEditor
+                offices={editableOffices}
+                selectedOffice={selectedOffice}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                selectedActaType={selectedActaType}
+                setSelectedActaType={setSelectedActaType}
+                milestones={milestones}
+                updateMilestone={updateMilestone}
+                updateActa={updateActa}
+                markAllActas={markAllActas}
+                unmarkAllActas={unmarkAllActas}
+                getOfficeStatus={getOfficeStatus}
+                statusInfo={statusInfo}
+              />
+            ) : (
+              <div className="tab-view empty-results">
+                No hay zonas disponibles para tu circunscripción.
+              </div>
+            )
           )}
 
           {/* Vista: REPORTES */}
           {activeTab === 'reportes' && (
             <div className="tab-view reports-container">
               <h2>Reportes de seguimiento</h2>
-              <p>Selecciona una circunscripción o estado para consultar y exportar únicamente las oficinas correspondientes.</p>
-
+              <small>
+                Selecciona una circunscripción o una etapa. Las etapas incluyen también las zonas que ya avanzaron.
+              </small>
+            <p />
               <div className="filter-tabs report-filter-tabs">
                 <div className="report-circunscription-filter">
                   <label htmlFor="report-circunscription-filter">Circunscripciones:</label>
@@ -578,10 +835,10 @@ export default function App() {
                 <strong>{reportOffices.length}</strong>
                 <span>
                   {reportFilter !== 'Todas'
-                    ? `oficinas con estado "${reportFilter}"`
+                    ? `oficinas que alcanzaron "${reportFilter}"`
                     : reportCircunscriptionFilter !== 'Todas'
                       ? `oficinas de ${reportCircunscriptionFilter}`
-                      : 'oficinas en total'}
+                      : 'Zonas electorales'}
                 </span>
               </div>
 
@@ -605,6 +862,11 @@ export default function App() {
           )}
         </section>
       </main>
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }

@@ -1,6 +1,9 @@
+import { getAuthToken, refreshAuthToken } from './authService';
+
 const apiUrl = import.meta.env.VITE_API_URL || '/api';
 const cacheKey = 'cne-seguimiento-cache';
 
+// La caché permite mostrar el último estado conocido mientras se consulta la API.
 export const getCachedSeguimiento = () => {
   const cached = localStorage.getItem(cacheKey);
   if (!cached) return null;
@@ -19,10 +22,27 @@ const cacheSeguimiento = (offices) => {
 };
 
 const requestSeguimiento = async (options = {}) => {
+  const token = getAuthToken();
   const response = await fetch(`${apiUrl}/seguimiento`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
+
+  // Si obtiene 401, intenta refrescar el token una sola vez
+  if (response.status === 401 && !options._refreshAttempted) {
+    try {
+      const refreshed = await refreshAuthToken();
+      if (refreshed) {
+        console.log('Token refrescado exitosamente, reintentando solicitud...');
+        return requestSeguimiento({ ...options, _refreshAttempted: true });
+      }
+    } catch (refreshError) {
+      console.error('No se pudo refrescar el token durante la solicitud de seguimiento.', refreshError);
+    }
+  }
 
   if (!response.ok) {
     const details = await response.text();
@@ -44,6 +64,7 @@ export const loadSeguimiento = async () => {
 };
 
 export const saveSeguimiento = async (offices, changedIds = null) => {
+  // Se envían códigos de zona porque son la clave estable en MongoDB.
   const changedZoneCodes = changedIds
     ? offices
       .filter((office) => changedIds.includes(office.id))
@@ -70,6 +91,7 @@ export const subscribeToSeguimiento = (onChange, onStatus, onError) => {
     try {
       const offices = await loadSeguimiento();
       const snapshot = JSON.stringify(offices);
+      // Evita actualizar React si el snapshot recibido no cambió.
       if (snapshot !== lastSnapshot) {
         lastSnapshot = snapshot;
         onChange(offices);
