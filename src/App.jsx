@@ -43,20 +43,41 @@ const getOfficeStatus = (office) => {
   return 'instalacion';
 };
 
-// Cuenta las actas de escrutinio marcadas para hombres y mujeres.
 const getDigitalizedScrutinyActs = (office) => {
   const scrutinyActs = office.actasDigitalizadas?.escrutinio || {};
-  return [...(scrutinyActs.hombres || []), ...(scrutinyActs.mujeres || [])]
-    .filter(Boolean)
-    .length;
+  const hombres = scrutinyActs.hombres || [];
+  const mujeres = scrutinyActs.mujeres || [];
+  const count = [...hombres, ...mujeres].filter(Boolean).length;
+  
+  const zoneCode = office.zoneCode || office.zona_codigo || 'desconocida';
+  if (zoneCode === 'zona_01') {
+    console.log(
+      `📊 getDigitalizedScrutinyActs para ${zoneCode}: `
+      + `hombres=${JSON.stringify(hombres)}, mujeres=${JSON.stringify(mujeres)}, `
+      + `total=${count}`
+    );
+  }
+  
+  return count;
 };
 
 // Cuenta las actas de instalación que ya fueron digitalizadas.
 const getDigitalizedInstallationActs = (office) => {
   const installationActs = office.actasDigitalizadas?.instalacion || {};
-  return [...(installationActs.hombres || []), ...(installationActs.mujeres || [])]
-    .filter(Boolean)
-    .length;
+  const hombres = installationActs.hombres || [];
+  const mujeres = installationActs.mujeres || [];
+  const count = [...hombres, ...mujeres].filter(Boolean).length;
+  
+  const zoneCode = office.zoneCode || office.zona_codigo || 'desconocida';
+  if (zoneCode === 'zona_01') {
+    console.log(
+      `📊 getDigitalizedInstallationActs para ${zoneCode}: `
+      + `hombres=${JSON.stringify(hombres)}, mujeres=${JSON.stringify(mujeres)}, `
+      + `total=${count}`
+    );
+  }
+  
+  return count;
 };
 
 // Calcula el total esperado de actas: tres de escrutinio y una de instalación por junta.
@@ -69,28 +90,61 @@ const getGeneralProgress = (office) => {
   const completedMilestones = Object.values(office.milestones || {}).filter(Boolean).length;
   const totalScrutinyActs = getTotalActas(office, 'escrutinio');
   const totalInstallationActs = getTotalActas(office, 'instalacion');
-  const scrutinyProgress = totalScrutinyActs
-    ? getDigitalizedScrutinyActs(office) / totalScrutinyActs
-    : 0;
-  const installationProgress = totalInstallationActs
-    ? getDigitalizedInstallationActs(office) / totalInstallationActs
-    : 0;
+  const digitalizedScrutiny = getDigitalizedScrutinyActs(office);
+  const digitalizedInstallation = getDigitalizedInstallationActs(office);
+  
+  // Verificar que todas las actas requeridas estén realmente completadas
+  const scrutinyProgress = totalScrutinyActs ? digitalizedScrutiny / totalScrutinyActs : 0;
+  const installationProgress = totalInstallationActs ? digitalizedInstallation / totalInstallationActs : 0;
   const completedBeforeDigitalization = Math.min(completedMilestones, 4);
 
   // El avance combina hitos y digitalización de actas de instalación y escrutinio.
   const calculatedProgress = Math.round((
     completedBeforeDigitalization + scrutinyProgress + installationProgress
   ) / milestones.length * 100);
+  
+  // REGLA ESTRICTA: Verificar que TODO esté 100% completo para retornar 100
   const allMilestonesComplete = milestones.every(
     (milestone) => office.milestones?.[milestone.id]
   );
-  const allActsComplete = areActasComplete(office, 'escrutinio')
-    && areActasComplete(office, 'instalacion');
+  const allScrutinyActsComplete = totalScrutinyActs === 0 || (digitalizedScrutiny === totalScrutinyActs && totalScrutinyActs > 0);
+  const allInstallationActsComplete = totalInstallationActs === 0 || (digitalizedInstallation === totalInstallationActs && totalInstallationActs > 0);
 
-  // El redondeo nunca puede ocultar un hito o acta pendiente.
-  return calculatedProgress >= 100 && (!allMilestonesComplete || !allActsComplete)
-    ? 99
-    : calculatedProgress;
+  // Debug logging para zona_codigo o zoneCode
+  const zoneCode = office.zoneCode || office.zona_codigo || 'desconocida';
+  if (zoneCode === 'zona_01') {
+    console.log(
+      `🔢 getGeneralProgress para ${zoneCode}: `
+      + `hitos=${completedMilestones}/6, `
+      + `escrutinio=${digitalizedScrutiny}/${totalScrutinyActs}, `
+      + `instalacion=${digitalizedInstallation}/${totalInstallationActs}, `
+      + `calculado=${calculatedProgress}%, `
+      + `hitos_completos=${allMilestonesComplete}, `
+      + `escrutinio_completo=${allScrutinyActsComplete}, `
+      + `instalacion_completo=${allInstallationActsComplete}`
+    );
+  }
+
+  // NUNCA retornar 100 si falta algo
+  // Regla simple: solo 100 si TODAS las actas están marcadas Y todos los hitos están completos
+  if (calculatedProgress === 100 || (scrutinyProgress === 1 && installationProgress === 1 && allMilestonesComplete)) {
+    // Verificación final extrema: contar el número real de actas
+    const totalExpectedActas = totalScrutinyActs + totalInstallationActs;
+    const totalDigitalizedActas = digitalizedScrutiny + digitalizedInstallation;
+    
+    if (totalDigitalizedActas < totalExpectedActas) {
+      if (zoneCode === 'zona_01') {
+        console.log(
+          `⚠️ BLOQUEANDO 100%: Se esperaban ${totalExpectedActas} actas pero solo hay ${totalDigitalizedActas} digitalizadas`
+        );
+      }
+      return 99;
+    }
+    
+    return 100;
+  }
+
+  return calculatedProgress;
 };
 
 // Indica si todas las actas de un tipo fueron digitalizadas.
@@ -122,10 +176,23 @@ const normalizeActas = (office) => {
     const totalMujeres = office.juntasWomen * multiplier;
 
     // Siempre se crean arreglos del tamaño esperado, incluso si MongoDB no tiene datos.
-    return {
+    const normalized = {
       hombres: Array.from({ length: totalHombres }, (_, index) => Boolean(savedActas.hombres?.[index])),
       mujeres: Array.from({ length: totalMujeres }, (_, index) => Boolean(savedActas.mujeres?.[index])),
     };
+    
+    const zoneCode = office.zoneCode || office.zona_codigo || 'desconocida';
+    if (zoneCode === 'zona_01') {
+      console.log(
+        `🔧 normalizeActas para ${zoneCode} ${type}: `
+        + `saved.hombres=${JSON.stringify(savedActas.hombres)}, `
+        + `saved.mujeres=${JSON.stringify(savedActas.mujeres)}, `
+        + `normalized.hombres=${JSON.stringify(normalized.hombres)}, `
+        + `normalized.mujeres=${JSON.stringify(normalized.mujeres)}`
+      );
+    }
+    
+    return normalized;
   };
 
   return {
@@ -137,6 +204,14 @@ const normalizeActas = (office) => {
 // Completa campos faltantes y recalcula el avance antes de guardar en el estado de React.
 const normalizeOffices = (offices) => offices.map((office) => {
   const actasDigitalizadas = normalizeActas(office);
+  
+  const zoneCode = office.zona_codigo || office.zoneCode || 'desconocida';
+  if (zoneCode === 'zona_01') {
+    console.log(
+      `🔄 normalizeOffices recibiendo para ${zoneCode}: `
+      + `actasDigitalizadas=${JSON.stringify(actasDigitalizadas)}`
+    );
+  }
   
   // Los hitos son la fuente de verdad. Solo usamos el campo del servidor si existe.
   // No usamos office.progress para determinar hitos - progress se calcula DESDE los hitos.
@@ -156,7 +231,15 @@ const normalizeOffices = (offices) => offices.map((office) => {
   );
 
   const normalizedOffice = { ...office, actasDigitalizadas, milestones: normalizedMilestones };
-  return { ...normalizedOffice, progress: getGeneralProgress(normalizedOffice) };
+  const finalProgress = getGeneralProgress(normalizedOffice);
+  
+  if (zoneCode === 'zona_01') {
+    console.log(
+      `📊 normalizeOffices final progress para ${zoneCode}: ${finalProgress}%`
+    );
+  }
+  
+  return { ...normalizedOffice, progress: finalProgress };
 });
 
 const getOfficeKey = (office) => `${office.country}|${office.zone}`;
@@ -241,12 +324,14 @@ export default function App() {
     setActiveTab('avances');
   };
 
-  const handleLogout = () => {
+  const handleLogout = (silent = false) => {
     logout();
     setAuthSession(null);
-    setIsLoginModalOpen(false);
-    setSelectedActaType(null);
-    setActiveTab('resumen');
+    if (!silent) {
+      setIsLoginModalOpen(false);
+      setSelectedActaType(null);
+      setActiveTab('resumen');
+    }
   };
 
   useEffect(() => {
@@ -345,13 +430,54 @@ export default function App() {
     };
   }, [authSession?.token]);
 
+  // Escucha el evento personalizado de token refrescado
+  // Solo actualiza el token sin cerrar sesión
+  useEffect(() => {
+    const handleTokenRefreshed = (event) => {
+      const updatedSession = event.detail;
+      if (updatedSession && updatedSession.token) {
+        // Usa función de actualización para acceder al estado anterior de forma segura
+        setAuthSession((prevSession) => {
+          if (!prevSession) {
+            // Si no hay sesión previa, no hacer nada
+            console.warn('No hay sesión previa, ignorando token refresh');
+            return prevSession;
+          }
+          // Solo actualiza el token, manteniendo el usuario y resto igual
+          const newSession = {
+            ...prevSession,
+            token: updatedSession.token,
+          };
+          console.log('✅ Sesión sincronizada: Token refrescado automáticamente');
+          return newSession;
+        });
+      }
+    };
+
+    window.addEventListener('tokenRefreshed', handleTokenRefreshed);
+
+    return () => {
+      window.removeEventListener('tokenRefreshed', handleTokenRefreshed);
+    };
+  }, []);
+
   // Guarda una modificación y evita perder cambios concurrentes usando dataVersion.
-  const persistOffices = async (nextOffices, changedId, errorMessage) => {
+  const persistOffices = async (nextOffices, changedId, errorMessage, silent = false) => {
     const operationId = saveSequenceRef.current + 1;
     saveSequenceRef.current = operationId;
     isSavingRef.current = true;
-    setOffices(nextOffices);
-    setSyncStatus('Guardando...');
+    // En modo silencioso, preserve campos importantes como zoneCode del estado anterior
+    if (silent) {
+      setOffices(offices.map((office) => {
+        const nextOffice = nextOffices.find((o) => o.id === office.id);
+        return nextOffice ? { ...office, ...nextOffice } : office;
+      }));
+    } else {
+      setOffices(nextOffices);
+    }
+    if (!silent) {
+      setSyncStatus('Guardando...');
+    }
 
     // Las escrituras se serializan para evitar conflictos entre cambios rápidos.
     const saveTask = saveQueueRef.current.then(async () => {
@@ -398,6 +524,8 @@ export default function App() {
           }
           
           // Paso 3: Encontrar la oficina modificada
+          // IMPORTANTE: Usar 'nextOffices' (parámetro), no 'offices' (estado)
+          // porque setOffices es asincrónico y podría no estar actualizado aún
           const changedOffice = nextOffices.find((office) => office.id === changedId);
           const currentOffice = currentOffices.find(
             (office) => office.zoneCode === changedOffice?.zoneCode
@@ -414,11 +542,34 @@ export default function App() {
             `Preparando guardado para zona ${changedOffice.zoneCode} `
             + `(versión: ${currentOffice.dataVersion} → ${currentOffice.dataVersion + 1})`
           );
+          console.log('📋 Datos enviados:');
+          console.log('  - ID:', changedId);
+          console.log('  - zoneCode:', changedOffice.zoneCode);
+          console.log('  - milestones:', changedOffice.milestones);
+          console.log('  - progress:', changedOffice.progress);
+          
+          // Log detallado para zona_01
+          if (changedOffice.zoneCode === 'zona_01') {
+            console.log('  - actasDigitalizadas:', changedOffice.actasDigitalizadas);
+            console.log(
+              `  - escrutinio actas: hombres=${JSON.stringify(changedOffice.actasDigitalizadas?.escrutinio?.hombres)}, `
+              + `mujeres=${JSON.stringify(changedOffice.actasDigitalizadas?.escrutinio?.mujeres)}`
+            );
+            console.log(
+              `  - instalacion actas: hombres=${JSON.stringify(changedOffice.actasDigitalizadas?.instalacion?.hombres)}, `
+              + `mujeres=${JSON.stringify(changedOffice.actasDigitalizadas?.instalacion?.mujeres)}`
+            );
+          }
 
           // Paso 4: Preparar datos para guardar (mantener dataVersion del servidor)
+          // IMPORTANTE: Mezclar cambios del usuario con estado actual del servidor
           const officesToSave = currentOffices.map((office) => (
             office.zoneCode === changedOffice.zoneCode
-              ? { ...changedOffice, dataVersion: currentOffice.dataVersion, id: currentOffice.id }
+              ? { 
+                  ...changedOffice, 
+                  dataVersion: currentOffice.dataVersion, 
+                  id: currentOffice.id 
+                }
               : office
           ));
 
@@ -431,7 +582,7 @@ export default function App() {
           );
           
           const result = await Promise.race([
-            saveSeguimiento(officesToSave, [changedOffice.zoneCode]),
+            saveSeguimiento(officesToSave, [changedId]),
             timeoutPromise,
           ]);
 
@@ -443,72 +594,164 @@ export default function App() {
           // Paso 7: Actualizar estado local si esta operación sigue siendo la actual
           if (operationId === saveSequenceRef.current) {
             setOffices(reconcileOffices(result.offices));
-            setSyncStatus('Guardado correctamente');
+            if (!silent) {
+              setSyncStatus('Guardado correctamente');
+            }
             console.log(
               `✅ Guardado exitoso para zona ${changedOffice.zoneCode}. `
               + `${result.updated} zona(s) actualizada(s).`
             );
+            // Solo después de guardado exitoso se marcar como no guardando
+            isSavingRef.current = false;
           } else {
             console.log('Esta operación fue cancelada por una más reciente.');
           }
         } catch (error) {
-          console.error(errorMessage, error);
+          if (!silent) {
+            console.error(errorMessage, error);
+          } else {
+            console.warn(`Error en modo silencioso: ${error.message}`);
+          }
           if (operationId !== saveSequenceRef.current) {
             console.log('Error en operación cancelada, ignorando.');
             return;
           }
 
-          // Manejar diferentes tipos de errores
+          // En modo silencioso, reintenta cualquier error (no solo 401)
+          if (silent && retryCount < maxRetries) {
+            retryCount++;
+            // Backoff exponencial: 1s, 2s, 4s, etc.
+            const delayMs = 1000 * Math.pow(2, retryCount - 1);
+            console.warn(`Reintento ${retryCount}/${maxRetries} en modo silencioso en ${delayMs}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            return attemptSave();
+          }
+
+          // Manejar diferentes tipos de errores (modo normal)
           if (error.status === 401) {
             // Token expirado o inválido - NUNCA cierre sesión sin intentar refrescar primero
-            console.warn(`⚠️  Error 401 recibido`);
+            if (!silent) {
+              console.warn(`⚠️  Error 401 recibido`);
+            }
             
             if (retryCount < maxRetries) {
-              console.log(
-                `Intento ${retryCount + 1}/${maxRetries}: Refrescando token...`
-              );
+              if (!silent) {
+                console.log(
+                  `Intento ${retryCount + 1}/${maxRetries}: Refrescando token...`
+                );
+              }
               retryCount++;
               try {
                 // Siempre intenta refrescar el token
                 const refreshed = await refreshAuthToken();
                 if (refreshed) {
-                  console.log('✅ Token refrescado, reintentando guardado...');
+                  if (!silent) {
+                    console.log('✅ Token refrescado, reintentando guardado...');
+                  }
                   return attemptSave();
                 } else {
                   console.warn('❌ No se pudo refrescar el token');
+                  // En modo silencioso, no cierra sesión inmediatamente
+                  if (!silent) {
+                    console.error('Cerrando sesión porque no se pudo refrescar...');
+                    handleLogout();
+                    setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
+                  } else {
+                    console.log('Reintento fallido en modo silencioso, esperando siguiente intento...');
+                  }
                 }
               } catch (refreshError) {
                 console.error('Error al refrescar token:', refreshError);
+                // En modo silencioso, no cierra sesión inmediatamente
+                if (!silent) {
+                  console.error('Cerrando sesión porque hubo error al refrescar...');
+                  handleLogout();
+                  setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
+                }
               }
             } else {
               console.error(`❌ Se agotaron los ${maxRetries} reintentos de refresh`);
+              // En modo silencioso, NO cierra sesión. Mantiene los datos locales.
+              if (!silent) {
+                console.error('Cerrando sesión...');
+                handleLogout();
+                setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
+              } else {
+                console.warn('No se pudo guardar en BD, pero mantiene datos locales. Reintentará en siguiente guardado.');
+              }
             }
-            
-            // SOLO cierra sesión después de agotar reintentos
-            console.error('Cerrando sesión...');
-            handleLogout();
-            setSyncStatus('La sesión expiró. Por favor, inicia sesión de nuevo.');
           } else if (error.status === 403) {
-            setSyncStatus('No tienes permisos para modificar esta circunscripción.');
+            // Permiso denegado - en modo silencioso, reintenta; en modo normal, informa al usuario
+            if (!silent) {
+              setSyncStatus('No tienes permisos para modificar esta circunscripción.');
+            } else {
+              // En modo silencioso, reintenta después de un delay
+              if (retryCount < maxRetries) {
+                retryCount++;
+                const delayMs = 1000 * Math.pow(2, retryCount - 1);
+                console.warn(`Reintento ${retryCount}/${maxRetries} después de error 403 en ${delayMs}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                return attemptSave();
+              }
+            }
           } else if (error.status === 409) {
             // Conflicto: datos modificados por otro usuario
-            console.log('Conflicto detectado: datos modificados por otro usuario.');
+            if (!silent) {
+              console.log('Conflicto detectado: datos modificados por otro usuario.');
+            }
             try {
               const currentOffices = await loadSeguimiento();
               setOffices(reconcileOffices(currentOffices));
-              setSyncStatus('Se recargaron cambios centrales (actualizado por otro usuario)');
+              if (!silent) {
+                setSyncStatus('Se recargaron cambios centrales (actualizado por otro usuario)');
+              } else {
+                console.log('Conflicto resuelto en modo silencioso: se recargaron datos del servidor.');
+              }
+              
+              // IMPORTANTE: Después de resolver el conflicto, reintentamos el guardado
+              if (retryCount < maxRetries) {
+                retryCount++;
+                const delayMs = 1000 * Math.pow(2, retryCount - 1);
+                console.warn(`Reintento ${retryCount}/${maxRetries} después de resolver conflicto en ${delayMs}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                return attemptSave();
+              }
             } catch (reloadError) {
               console.error('No se pudo recargar después de conflicto.', reloadError);
-              setSyncStatus('Error al sincronizar conflicto');
+              // En modo silencioso, reintenta después de error de recarga
+              if (silent && retryCount < maxRetries) {
+                retryCount++;
+                const delayMs = 1000 * Math.pow(2, retryCount - 1);
+                console.warn(`Reintento ${retryCount}/${maxRetries} después de conflicto no resuelto en ${delayMs}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                return attemptSave();
+              }
+              if (!silent) {
+                setSyncStatus('Error al sincronizar conflicto');
+              }
             }
           } else {
             // Otros errores
-            setSyncStatus(`Error al guardar: ${error.message}`);
+            if (!silent) {
+              setSyncStatus(`Error al guardar: ${error.message}`);
+            } else {
+              // En modo silencioso, reintenta otros errores también
+              if (retryCount < maxRetries) {
+                retryCount++;
+                const delayMs = 1000 * Math.pow(2, retryCount - 1);
+                console.warn(`Reintento ${retryCount}/${maxRetries} después de error ${error.status || 'desconocido'} en ${delayMs}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                return attemptSave();
+              }
+            }
           }
-        } finally {
+          
+          // Si llegamos aquí, la operación terminó (ya sea con éxito o error final)
           if (operationId === saveSequenceRef.current) {
             isSavingRef.current = false;
           }
+        } finally {
+          // El finally no debe tocar isSavingRef - eso se maneja explícitamente arriba
         }
       };
 
@@ -576,13 +819,22 @@ export default function App() {
     // El total general incluye ambos tipos; no se usa como denominador de un tipo.
     const totalActs = totalScrutinyActs + totalInstallationActs;
 
+    // Calcula el promedio pero asegura que sea 99 si no todo está al 100%
+    const sumProgress = participatingOffices.reduce((sum, office) => sum + getGeneralProgress(office), 0);
+    const averageProgress = participatingOffices.length
+      ? Math.round(sumProgress / participatingOffices.length)
+      : 0;
+    
+    // REGLA ESTRICTA: Si hay actas pendientes, el promedio NUNCA puede ser 100
+    const totalDigitizedActs = digitizedActs + digitizedInstallationActs;
+    const allActsComplete = totalDigitizedActs === totalActs;
+    const averageProgressFinal = averageProgress === 100 && !allActsComplete ? 99 : averageProgress;
+
     return {
       total: participatingOffices.length,
       completed: participatingOffices.filter((office) => getOfficeStatus(office) === 'finalizado').length,
       excludedGeneralPercentage: offices.filter(isExcludedFromGeneralPercentage).length,
-      average: participatingOffices.length
-        ? Math.round(participatingOffices.reduce((sum, office) => sum + getGeneralProgress(office), 0) / participatingOffices.length)
-        : 0,
+      average: averageProgressFinal,
       electors: participatingOffices.reduce((sum, office) => sum + office.electors, 0),
       juntas: participatingOffices.reduce((sum, office) => sum + office.juntas, 0),
       totalScrutinyActs,
@@ -639,7 +891,8 @@ export default function App() {
     void persistOffices(
       officesWithProgress,
       id,
-      'No se pudo guardar el seguimiento en MongoDB.'
+      'No se pudo guardar el seguimiento en MongoDB.',
+      true  // silent = true
     );
   };
 
@@ -651,6 +904,17 @@ export default function App() {
       const currentActas = office.actasDigitalizadas?.[actaType]?.[gender] || [];
       const nextActas = [...currentActas];
       nextActas[actaIndex] = !nextActas[actaIndex];
+      
+      const zoneCode = office.zona_codigo || 'desconocida';
+      if (zoneCode === 'zona_01') {
+        console.log(
+          `✏️ updateActa for ${zoneCode}: `
+          + `type=${actaType}, gender=${gender}, index=${actaIndex}, `
+          + `before=${JSON.stringify(currentActas)}, `
+          + `after=${JSON.stringify(nextActas)}`
+        );
+      }
+      
       const nextActasDigitalizadas = {
         ...office.actasDigitalizadas,
         [actaType]: {
@@ -673,13 +937,21 @@ export default function App() {
         ? 'digitalizacionEscrutinio'
         : 'digitalizacionInstalacion'] = areActasComplete(nextOffice, actaType);
 
-      return { ...nextOffice, progress: getGeneralProgress(nextOffice) };
+      const finalProgress = getGeneralProgress(nextOffice);
+      if (zoneCode === 'zona_01') {
+        console.log(
+          `📈 updateActa final progress for ${zoneCode}: ${finalProgress}%`
+        );
+      }
+      
+      return { ...nextOffice, progress: finalProgress };
     });
 
     void persistOffices(
       nextOffices,
       id,
-      'No se pudo guardar la digitalización de actas.'
+      'No se pudo guardar la digitalización de actas.',
+      true  // silent = true
     );
   };
 
@@ -714,7 +986,8 @@ export default function App() {
     void persistOffices(
       nextOffices,
       id,
-      'No se pudo guardar la digitalización completa de actas.'
+      'No se pudo guardar la digitalización completa de actas.',
+      true  // silent = true
     );
   };
 
@@ -749,7 +1022,8 @@ export default function App() {
     void persistOffices(
       nextOffices,
       id,
-      'No se pudo desmarcar la digitalización de actas.'
+      'No se pudo desmarcar la digitalización de actas.',
+      true  // silent = true
     );
   };
 

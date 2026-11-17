@@ -11,13 +11,6 @@ export default function MetricsGrid({ stats }) {
         </div>
       </div>
       <div className="stat-card">
-        <span className="stat-icon">📈</span>
-        <div className="metric-content">
-          <h3>{stats.average}%</h3>
-          <p>Avance Global De Zonas Electorales</p>
-        </div>
-      </div>
-      <div className="stat-card">
         <span className="stat-icon">👥</span>
         <div className="metric-content">
           <h3>{formatNumber(stats.electors)}</h3>
@@ -27,16 +20,35 @@ export default function MetricsGrid({ stats }) {
       <div className="stat-card">
         <span className="stat-icon">📋</span>
         <div className="metric-content">
-          <h3>{formatNumber(stats.totalActs)}</h3>
-          <p>Actas de Escrutinio Totales</p>
+          <h3>{formatNumber(stats.totalScrutinyActs)}</h3>
+          <p>Actas de escrutinio totales</p>
+        </div>
+      </div>
+      <div className="stat-card">
+        <span className="stat-icon">📄</span>
+        <div className="metric-content">
+          <h3>{formatNumber(stats.totalInstallationActs)}</h3>
+          <p>Actas de instalación totales</p>
         </div>
       </div>
       <div className="stat-card">
         <span className="stat-icon">📈</span>
         <div className="metric-content">
           <h3>{stats.digitizedActsProgress}%</h3>
-          <p>Porcentaje de actas digitalizadas</p>
-          <small className="metric-detail">{formatNumber(stats.digitizedActs)} de {formatNumber(stats.totalActs)} actas</small>
+          <p>Escrutinio digitalizado</p>
+          <small className="metric-detail">
+            {formatNumber(stats.digitizedActs)} de {formatNumber(stats.totalScrutinyActs)} actas
+          </small>
+        </div>
+      </div>
+      <div className="stat-card">
+        <span className="stat-icon">📈</span>
+        <div className="metric-content">
+          <h3>{stats.installationActsProgress}%</h3>
+          <p>Instalación digitalizada</p>
+          <small className="metric-detail">
+            {formatNumber(stats.digitizedInstallationActs)} de {formatNumber(stats.totalInstallationActs)} actas
+          </small>
         </div>
       </div>
       <div className="stat-card">

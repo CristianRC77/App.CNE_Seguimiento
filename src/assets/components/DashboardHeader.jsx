@@ -1,4 +1,5 @@
 export default function DashboardHeader({ activeTab }) {
+  // Relaciona cada pestaña con el título que debe ver el usuario.
   const titles = {
     resumen: 'Resumen General del Proceso',
     oficinas: 'Avances de Zonas Electorales',
@@ -6,6 +7,7 @@ export default function DashboardHeader({ activeTab }) {
     reportes: 'Reportes Electorales',
   };
 
+  // Si llega una pestaña desconocida, se muestra un título seguro por defecto.
   return (
     <header className="content-header">
       <div>

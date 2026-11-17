@@ -1,15 +1,20 @@
 
 import { useEffect, useState } from 'react';
+import { getCompletionPercentage } from '../constants/cneConstants';
 
+// Formatea cantidades con separadores usados en Ecuador.
 const formatNumber = (value) => new Intl.NumberFormat('es-EC').format(value);
+// Presenta la hora de actualización del panel según la configuración regional.
 const formatUpdatedAt = (value) => new Intl.DateTimeFormat('es-EC', {
   dateStyle: 'short',
   timeStyle: 'short',
+  hourCycle: 'h23',
 }).format(value);
 
 const getCumulativeStatuses = (statuses, total) => {
   let cumulativeCount = 0;
 
+  // Cada estado muestra también la acumulación de los estados posteriores.
   const cumulativeStatuses = statuses.reduceRight((result, status) => {
     cumulativeCount += status.count;
 
@@ -32,10 +37,12 @@ const getCumulativeStatuses = (statuses, total) => {
   return cumulativeStatuses;
 };
 
+// Resume actas totales, digitalizadas y pendientes para una lista de zonas.
 const getActaProgress = (offices) => {
   const totals = offices.reduce((result, office) => {
     const scrutiny = office.actasDigitalizadas?.escrutinio || {};
     const installation = office.actasDigitalizadas?.instalacion || {};
+    // Cada junta aporta tres actas de escrutinio y una de instalación.
     const total = (office.juntasMen + office.juntasWomen) * 4;
     const digitalized = [
       ...(scrutiny.hombres || []),
@@ -53,11 +60,12 @@ const getActaProgress = (offices) => {
   return {
     ...totals,
     pending: totals.total - totals.digitalized,
-    percentage: totals.total ? Math.round((totals.digitalized / totals.total) * 100) : 0,
+    percentage: getCompletionPercentage(totals.digitalized, totals.total),
   };
 };
 
 export default function OverviewCharts({ offices, stats, statusInfo, getOfficeStatus }) {
+  // Se actualiza el reloj del panel cada minuto sin recargar los datos.
   const [updatedAt, setUpdatedAt] = useState(() => new Date());
 
   useEffect(() => {
@@ -67,18 +75,19 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Cuenta zonas por estado para construir la leyenda del gráfico.
   const statusCounts = getCumulativeStatuses(Object.keys(statusInfo).map((status) => ({
     status,
     ...statusInfo[status],
     count: offices.filter((office) => getOfficeStatus(office) === status).length,
   })), offices.length);
-  const notStartedCount = offices.filter((office) => getOfficeStatus(office) === 'sinEmpezar').length;
-  const startedCount = offices.length - notStartedCount;
+  // Define el orden institucional en que se muestran las circunscripciones.
   const circunscriptionOrder = [
     'EUROPA, OCEANÍA Y ASIA',
     'CANADÁ Y ESTADOS UNIDOS',
     'LATINOAMÉRICA, EL CARIBE Y ÁFRICA',
   ];
+  // Agrupa zonas por circunscripción y calcula su progreso de actas.
   const circunscriptionProgress = [...new Set(offices.map((office) => office.circunscription))]
     .sort((a, b) => {
       const positionA = circunscriptionOrder.indexOf(a);
@@ -104,6 +113,7 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
         statuses: statusItems,
       };
     });
+  // Calcula el indicador global de actas para el tercer panel.
   const totalActasProgress = getActaProgress(offices);
 
   return (
@@ -114,7 +124,6 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
           <div>
             <h2>Avance general</h2>
             <p>Porcentaje ponderado según electores</p>
-            <p>Faltan {formatNumber(notStartedCount)} por empezar y {formatNumber(startedCount)} empezadas de {formatNumber(offices.length)}</p>
           </div>
         </div>
         <div className="progress-content">
@@ -152,7 +161,7 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
         </div>
         <div className="panel-footer">
           <span><i className="green-dot" /> Electores registrados: <b>{formatNumber(stats.electors)}</b></span>
-          <span className="target">{formatNumber(stats.juntas)} juntas · {formatNumber(stats.totalActs)} actas</span>
+          <span className="text-muted">{formatNumber(stats.juntas)}  Juntas · {formatNumber(stats.totalScrutinyActs)} Actas de Escrutinio</span>
           <span className="updated-at">Actualizado: {formatUpdatedAt(updatedAt)}</span>
         </div>
       </article>
@@ -202,19 +211,29 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
       <article className="panel acts-progress-panel">
         <div className="panel-heading">
           <div>
-            <h2>Actas de escrutinio digitalizadas</h2>
-            <p>Actas asociadas a zonas digitalizadas</p>
+            <h2>Actas digitalizadas Escrutinio - Instalación</h2>
+            <p>Progreso de actas digitalizadas en los procesos de escrutinio e instalación</p>
           </div>
         </div>
         <div className="acts-progress">
           <div className="acts-progress-number">
             <strong>{formatNumber(stats.digitizedActs)}</strong>
-            <span>de {formatNumber(stats.totalActs)} actas</span>
+            <span>de {formatNumber(stats.totalScrutinyActs)} de escrutinio</span>
           </div>
           <div className="acts-progress-bar">
             <span style={{ width: `${stats.digitizedActsProgress}%` }} />
           </div>
           <strong className="acts-progress-percent">{stats.digitizedActsProgress}%</strong>
+        </div>
+        <div className="acts-progress">
+          <div className="acts-progress-number">
+            <strong>{formatNumber(stats.digitizedInstallationActs)}</strong>
+            <span>de {formatNumber(stats.totalInstallationActs)} de instalación</span>
+          </div>
+          <div className="acts-progress-bar">
+            <span style={{ width: `${stats.installationActsProgress}%` }} />
+          </div>
+          <strong className="acts-progress-percent">{stats.installationActsProgress}%</strong>
         </div>
         <div className="panel-footer">
           <span>{formatNumber(stats.digitizedZones)} de {formatNumber(stats.total)} zonas completadas</span>

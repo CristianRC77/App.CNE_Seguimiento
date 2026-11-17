@@ -1,5 +1,18 @@
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+const getCircunscriptionLabel = (circunscription) => ({
+  EUROPA_OCEANIA_ASIA: 'Europa, Oceanía y Asia',
+  CANADA_EEUU: 'Canadá y Estados Unidos',
+  LATAM_CARIBE_AFRICA: 'Latinoamérica, el Caribe y África',
+}[circunscription] || circunscription || 'Todas las circunscripciones');
+
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  onProtectedTabClick,
+  authSession,
+  onLogout,
+}) {
+  // La barra lateral cambia la vista activa sin recargar la aplicación.
   return (
     <aside className="sidebar">
       <div className="logo-box">
@@ -12,6 +25,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </div>
       </div>
 
+      {/* Cada botón representa una sección principal del seguimiento. */}
       <nav className="nav-menu">
         <button 
           className={`nav-item ${activeTab === 'resumen' ? 'active' : ''}`} 
@@ -27,9 +41,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </button>
         <button 
           className={`nav-item ${activeTab === 'avances' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('avances')}
+          onClick={onProtectedTabClick}
         >
-          ✅ Marcar Avances Ejecutados
+          {authSession ? '✅' : '🔒'} Marcar Avances Ejecutados
         </button>
         <button 
           className={`nav-item ${activeTab === 'reportes' ? 'active' : ''}`} 
@@ -41,13 +55,26 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
       <div className="sidebar-bottom">
         
-        <div className="profile">
-          <div className="avatar">CC</div>
-          <div>
-            <strong>Cristian Cancán</strong>
-            <span>Administrador</span>
+        {authSession ? (
+          <div className="profile">
+            <div className="avatar">{authSession.user.username.slice(0, 2).toUpperCase()}</div>
+            <div className="profile-details">
+              <strong>{authSession.user.nombreCompleto || authSession.user.username}</strong>
+              <span>{getCircunscriptionLabel(authSession.user.circunscripcion)}</span>
+              <button type="button" className="logout-btn" onClick={onLogout}>
+                Cerrar sesión
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="profile">
+            <div className="avatar">--</div>
+            <div>
+              <strong>Sesión no iniciada</strong>
+              <span>Solo lectura</span>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

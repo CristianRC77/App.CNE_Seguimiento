@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { getCompletionPercentage } from '../constants/cneConstants';
 
+// Formatea los electores en cada elemento de la lista de zonas.
 const formatNumber = (value) => new Intl.NumberFormat('es-EC').format(value);
 
 export default function MilestoneEditor({
@@ -17,8 +19,10 @@ export default function MilestoneEditor({
   getOfficeStatus,
   statusInfo,
 }) {
+  // Estos estados pertenecen únicamente a los filtros internos del editor.
   const [selectedCircunscription, setSelectedCircunscription] = useState('Todas');
   const [zoneSearch, setZoneSearch] = useState('');
+  // Los valores siguientes alimentan el resumen de la zona seleccionada.
   const selectedStatus = getOfficeStatus(selectedOffice);
   const completedMilestones = Object.values(selectedOffice.milestones).filter(Boolean).length;
   const actas = selectedOffice.actasDigitalizadas?.[selectedActaType] || { hombres: [], mujeres: [] };
@@ -29,9 +33,11 @@ export default function MilestoneEditor({
   const digitalizadasMujeres = actas.mujeres.filter(Boolean).length;
   const totalActas = totalActasHombres + totalActasMujeres;
   const digitalizadasActas = digitalizadasHombres + digitalizadasMujeres;
-  const actasProgress = totalActas ? Math.round((digitalizadasActas / totalActas) * 100) : 0;
+  const actasProgress = getCompletionPercentage(digitalizadasActas, totalActas);
+  // Los filtros reducen la lista de selección sin alterar los datos originales.
   const circunscriptions = [...new Set(offices.map((office) => office.circunscription))].sort();
   const normalizedSearch = zoneSearch.trim().toLowerCase();
+  // Permite localizar rápidamente una zona sin modificar la colección original.
   const filteredOffices = offices.filter((office) => {
     const matchesCircunscription = selectedCircunscription === 'Todas'
       || office.circunscription === selectedCircunscription;
@@ -132,6 +138,7 @@ export default function MilestoneEditor({
 
         <div className="milestones-grid">
           {milestones.map((milestone) => {
+            // Cada botón representa un hito y determina si puede marcarse o revertirse.
             const milestoneIndex = milestones.findIndex((item) => item.id === milestone.id);
             const milestoneStates = milestones.map((item) => Boolean(selectedOffice.milestones[item.id]));
             const isChecked = milestoneStates[milestoneIndex];
@@ -182,6 +189,7 @@ export default function MilestoneEditor({
           })}
         </div>
 
+        {/* Las actas aparecen después de iniciar el escrutinio. */}
         {selectedActaType && selectedOffice.milestones.inicioEscrutinio && (
         <section className="acts-checklist">
           <div className="acts-checklist-heading">

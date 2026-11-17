@@ -1,6 +1,8 @@
 import { statusInfo } from '../constants/cneConstants';
 
+// Construye y descarga un CSV con el estado de las oficinas seleccionadas.
 export const exportOfficesToCSV = (offices) => {
+  // Las columnas de estados se generan desde la configuración para evitar duplicación.
   const statusColumns = Object.entries(statusInfo);
   const header = [
     'Circunscripción', 'País', 'Oficina consular', 'Zona electoral',
@@ -8,6 +10,7 @@ export const exportOfficesToCSV = (offices) => {
        ...statusColumns.map(([, info]) => info.label),
   ];
   
+  // Cada oficina se convierte en una fila con sus datos y marcas de avance.
   const rows = offices.map((office) => {
     const currentStatus = getOfficeStatus(office);
     const currentStatusIndex = statusColumns.findIndex(([status]) => status === currentStatus);
@@ -27,6 +30,7 @@ export const exportOfficesToCSV = (offices) => {
     ];
   });
 
+  // Escapa comillas para que los nombres con caracteres especiales no rompan el CSV.
   const escapeCell = (value) => `"${String(value).replaceAll('"', '""')}"`;
   const csvContent = [header, ...rows]
     .map((row) => row.map(escapeCell).join(';'))
@@ -40,6 +44,7 @@ export const exportOfficesToCSV = (offices) => {
   URL.revokeObjectURL(url);
 };
 
+// Traduce la cantidad de hitos completados al estado usado en el reporte.
 const getOfficeStatus = (office) => {
   const completed = Object.values(office.milestones || {}).filter(Boolean).length;
   if (completed >= 6) return 'finalizado';

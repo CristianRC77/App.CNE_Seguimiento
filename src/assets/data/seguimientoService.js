@@ -23,6 +23,9 @@ const cacheSeguimiento = (offices) => {
 
 const requestSeguimiento = async (options = {}) => {
   const token = getAuthToken();
+  const tokenPreview = token ? `${token.substring(0, 20)}...` : 'Ausente';
+  console.log(`🔐 Token para requestSeguimiento: ${token ? '✅ Presente' : '❌'} (${tokenPreview})`);
+  
   const response = await fetch(`${apiUrl}/seguimiento`, {
     headers: {
       'Content-Type': 'application/json',
@@ -33,14 +36,17 @@ const requestSeguimiento = async (options = {}) => {
 
   // Si obtiene 401, intenta refrescar el token una sola vez
   if (response.status === 401 && !options._refreshAttempted) {
+    console.log('⚠️ Recibido 401 (Unauthorized), intentando refrescar token...');
     try {
       const refreshed = await refreshAuthToken();
       if (refreshed) {
-        console.log('Token refrescado exitosamente, reintentando solicitud...');
+        console.log('✅ Token refrescado exitosamente, reintentando solicitud...');
         return requestSeguimiento({ ...options, _refreshAttempted: true });
+      } else {
+        console.error('❌ refreshAuthToken retornó false');
       }
     } catch (refreshError) {
-      console.error('No se pudo refrescar el token durante la solicitud de seguimiento.', refreshError);
+      console.error('❌ No se pudo refrescar el token durante la solicitud de seguimiento.', refreshError);
     }
   }
 
@@ -67,10 +73,17 @@ export const saveSeguimiento = async (offices, changedIds = null) => {
   // Se envían códigos de zona porque son la clave estable en MongoDB.
   const changedZoneCodes = changedIds
     ? offices
-      .filter((office) => changedIds.includes(office.id))
+      .filter((office) => {
+        const matches = changedIds.includes(office.id);
+        if (!matches) {
+          console.warn(`⚠️ Oficina no coincide: id=${office.id}, zoneCode=${office.zoneCode}, changedIds=${changedIds}`);
+        }
+        return matches;
+      })
       .map((office) => office.zoneCode)
       .filter(Boolean)
     : undefined;
+  console.log(`📤 Enviando saveSeguimiento: changedIds=${changedIds}, changedZoneCodes=${Array.isArray(changedZoneCodes) ? changedZoneCodes.join(',') : 'ninguno'}`);
   const result = await requestSeguimiento({
     method: 'PUT',
     body: JSON.stringify({ offices, changedZoneCodes }),
@@ -85,6 +98,8 @@ export const saveSeguimiento = async (offices, changedIds = null) => {
 export const subscribeToSeguimiento = (onChange, onStatus, onError) => {
   let lastSnapshot = '';
   let pollingTimer;
+  let consecutiveErrors = 0;
+  const maxConsecutiveErrors = 5;
   onStatus('CONNECTING');
 
   const poll = async () => {
@@ -97,9 +112,22 @@ export const subscribeToSeguimiento = (onChange, onStatus, onError) => {
         onChange(offices);
       }
       onStatus('SUBSCRIBED');
+      consecutiveErrors = 0; // Reinicia el contador de errores después de éxito
     } catch (error) {
+      consecutiveErrors++;
       onError(error);
-      onStatus('CHANNEL_ERROR');
+      
+      // Si hay errores consecutivos, aumenta el intervalo de polling
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        onStatus('CHANNEL_ERROR');
+        // Polling más lento después de muchos errores: 15 segundos
+        clearInterval(pollingTimer);
+        pollingTimer = window.setInterval(() => void poll(), 15000);
+        console.warn(`Demasiados errores de polling. Aumentando intervalo a 15s.`);
+      } else {
+        // Mientras hay errores pero no tantos, usa el intervalo normal
+        onStatus('CHANNEL_ERROR');
+      }
     }
   };
 
