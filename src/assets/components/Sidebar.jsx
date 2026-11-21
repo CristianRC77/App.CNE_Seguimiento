@@ -1,4 +1,7 @@
 
+import { useState, useEffect } from 'react';
+import { getBrandConfig } from '../constants/brandConfig.js';
+
 const getCircunscriptionLabel = (circunscription) => ({
   EUROPA_OCEANIA_ASIA: 'Europa, Oceanía y Asia',
   CANADA_EEUU: 'Canadá y Estados Unidos',
@@ -12,16 +15,27 @@ export default function Sidebar({
   authSession,
   onLogout,
 }) {
+  const [brandConfig, setBrandConfig] = useState({
+    organizationName: 'Consejo Nacional Electoral',
+    subtitle: 'Oficinas Consulares',
+    logoPath: '/images/logo-cne.png',
+    logoAlt: 'Logo CNE',
+  });
+
+  useEffect(() => {
+    getBrandConfig().then(setBrandConfig);
+  }, []);
+
   // La barra lateral cambia la vista activa sin recargar la aplicación.
   return (
     <aside className="sidebar">
       <div className="logo-box">
         <div className="logo-badge">
-          <img src="/images/logo-cne.png" alt="Logo CNE" className="cne-logo-img" />
+          <img src={brandConfig.logoPath} alt={brandConfig.logoAlt} className="cne-logo-img" />
         </div>
         <div>
-          <h2>Consejo Nacional Electoral</h2>
-          <span>Oficinas Consulares</span>
+          <h2>{brandConfig.organizationName}</h2>
+          <span>{brandConfig.subtitle}</span>
         </div>
       </div>
 
