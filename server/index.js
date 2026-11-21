@@ -1,6 +1,7 @@
 import express from 'express';
 import authHandler from '../api/auth.js';
 import refreshHandler from '../api/refresh.js';
+import adminSetupHandler from '../api/admin-setup.js';
 import { authenticateRequest, authorizeZoneUpdates } from '../api/authMiddleware.js';
 import handler from '../api/seguimiento.js';
 import { getCollection } from '../api/mongodb.js';
@@ -36,6 +37,8 @@ app.get('/api/debug/users', async (request, response) => {
 
 app.post('/api/auth/login', (request, response) => authHandler(request, response));
 app.options('/api/auth/login', (request, response) => response.status(204).end());
+app.post('/api/admin-setup', (request, response) => adminSetupHandler(request, response));
+app.options('/api/admin-setup', (request, response) => response.status(204).end());
 app.post('/api/auth/refresh', (request, response) => refreshHandler(request, response));
 app.options('/api/auth/refresh', (request, response) => response.status(204).end());
 app.get('/api/seguimiento', (request, response) => handler(request, response));
