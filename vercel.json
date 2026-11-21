@@ -1,0 +1,15 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "env": [
+    "MONGODB_URI",
+    "MONGODB_DATABASE",
+    "MONGODB_COLLECTION",
+    "MONGODB_USERS_COLLECTION",
+    "MONGODB_GENERAL_ROLE_ID",
+    "MONGODB_CIRC_ROLE_ID",
+    "JWT_SECRET",
+    "JWT_EXPIRES_IN",
+    "VITE_API_URL"
+  ]
+}
