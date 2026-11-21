@@ -1,21 +1,4 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
-  ],
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "MONGODB_DATABASE": "@mongodb_database",
-    "MONGODB_COLLECTION": "@mongodb_collection",
-    "MONGODB_USERS_COLLECTION": "@mongodb_users_collection",
-    "MONGODB_GENERAL_ROLE_ID": "@mongodb_general_role_id",
-    "MONGODB_CIRC_ROLE_ID": "@mongodb_circ_role_id",
-    "JWT_SECRET": "@jwt_secret",
-    "JWT_EXPIRES_IN": "@jwt_expires_in",
-    "VITE_API_URL": "@vite_api_url"
-  }
+  "outputDirectory": "dist"
 }
