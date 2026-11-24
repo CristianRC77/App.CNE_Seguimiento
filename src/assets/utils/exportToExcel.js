@@ -151,7 +151,7 @@ export const exportOfficesToExcel = async (offices) => {
     // Fórmulas de subtotal para columnas numéricas
     numericColumns.forEach((colNum) => {
       const cell = row.getCell(colNum);
-      const colLetter = ExcelJS.utils.getExcelCellAddress(subtotalRow, colNum).replace(/\d+/, '');
+      const colLetter = getColumnLetter(colNum);
       cell.value = {
         formula: `=SUM(${colLetter}${startRow}:${colLetter}${subtotalRow - 1})`,
       };
@@ -189,7 +189,7 @@ export const exportOfficesToExcel = async (offices) => {
   // Fórmulas de total general
   numericColumns.forEach((colNum) => {
     const cell = totalRow.getCell(colNum);
-    const colLetter = ExcelJS.utils.getExcelCellAddress(grandTotalRow, colNum).replace(/\d+/, '');
+    const colLetter = getColumnLetter(colNum);
     
     // Sumar solo las filas de subtotal
     const subtotalRows = Array.from(totalsMap.values()).map(r => `${colLetter}${r}`).join('+');
@@ -237,9 +237,18 @@ export const exportOfficesToExcel = async (offices) => {
   URL.revokeObjectURL(url);
 };
 
-// ============================================================
-// FUNCIONES AUXILIARES
-// ============================================================
+/**
+ * Convierte número de columna a letra (1 = A, 2 = B, etc.)
+ */
+function getColumnLetter(colNum) {
+  let letter = '';
+  while (colNum > 0) {
+    colNum--;
+    letter = String.fromCharCode(65 + (colNum % 26)) + letter;
+    colNum = Math.floor(colNum / 26);
+  }
+  return letter;
+}
 
 /**
  * Agrupa las oficinas por circunscripción
