@@ -22,8 +22,9 @@ export const exportOfficesToExcel = async (offices) => {
   // ============================================================
   // 2. INSERTAR LOGO (ROW 1-3)
   // ============================================================
+  // Intentar cargar el logo - deshabilitado por ahora para evitar errores
+  /*
   try {
-    // Intentar cargar el logo desde URL pública
     const logoPath = '/images/logo-cne.png';
     const response = await fetch(logoPath);
     if (response.ok) {
@@ -38,21 +39,22 @@ export const exportOfficesToExcel = async (offices) => {
   } catch (error) {
     console.warn('No se pudo cargar el logo, continuando sin imagen');
   }
+  */
 
   // ============================================================
   // 3. ENCABEZADOS (ROW 1-3, COL C-H)
   // ============================================================
   // Combinar celdas para el título principal
-  worksheet.mergeCells('C1:H1');
-  const titleCell = worksheet.getCell('C1');
+  worksheet.mergeCells('A1:M1'); // 
+  const titleCell = worksheet.getCell('A1');
   titleCell.value = 'CONSEJO NACIONAL ELECTORAL';
-  titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
   worksheet.getRow(1).height = 25;
 
   // Subtítulo
-  worksheet.mergeCells('C2:H2');
+  worksheet.mergeCells('C2:M2');
   const subtitleCell = worksheet.getCell('C2');
   subtitleCell.value = 'Dirección de Procesos en el Exterior';
   subtitleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
@@ -61,8 +63,8 @@ export const exportOfficesToExcel = async (offices) => {
   worksheet.getRow(2).height = 20;
 
   // Fecha del reporte
-  worksheet.mergeCells('C3:H3');
-  const dateCell = worksheet.getCell('C3');
+  worksheet.mergeCells('A3:H3');
+  const dateCell = worksheet.getCell('A3');
   dateCell.value = `Reporte de Seguimiento - ${new Date().toLocaleDateString('es-ES')}`;
   dateCell.font = { italic: true, size: 10 };
   dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -152,9 +154,21 @@ export const exportOfficesToExcel = async (offices) => {
     numericColumns.forEach((colNum) => {
       const cell = row.getCell(colNum);
       const colLetter = getColumnLetter(colNum);
-      cell.value = {
-        formula: `=SUM(${colLetter}${startRow}:${colLetter}${subtotalRow - 1})`,
-      };
+      const formulaStr = `=SUM(${colLetter}${startRow}:${colLetter}${subtotalRow - 1})`;
+      
+      try {
+        cell.value = { formula: formulaStr };
+      } catch (e) {
+        // Si falla la fórmula, usar valor calculado
+        const sum = circOffices.reduce((acc, office) => {
+          if (colNum === 5) return acc + (office.juntas || 0);
+          if (colNum === 6) return acc + (office.juntasMen || 0);
+          if (colNum === 7) return acc + (office.juntasWomen || 0);
+          return acc;
+        }, 0);
+        cell.value = sum;
+      }
+      
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -191,9 +205,15 @@ export const exportOfficesToExcel = async (offices) => {
     const cell = totalRow.getCell(colNum);
     const colLetter = getColumnLetter(colNum);
     
-    // Sumar solo las filas de subtotal
-    const subtotalRows = Array.from(totalsMap.values()).map(r => `${colLetter}${r}`).join('+');
-    cell.value = { formula: subtotalRows ? `=${subtotalRows}` : 0 };
+    // Sumar valores directamente de los datos
+    let totalValue = 0;
+    offices.forEach((office) => {
+      if (colNum === 5) totalValue += office.juntas || 0;
+      if (colNum === 6) totalValue += office.juntasMen || 0;
+      if (colNum === 7) totalValue += office.juntasWomen || 0;
+    });
+    
+    cell.value = totalValue;
     cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
