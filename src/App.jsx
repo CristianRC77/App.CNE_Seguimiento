@@ -21,7 +21,7 @@ import {
   getAuthToken,
   isTokenExpiringsoon,
 } from './assets/data/authService';
-import { exportOfficesToExcel } from './assets/utils/exportToExcel';
+import { exportOfficesToCSV } from './assets/utils/exportUtils';
 import Sidebar from './assets/components/Sidebar';
 import LoginModal from './assets/components/LoginModal';
 import DashboardHeader from './assets/components/DashboardHeader';
@@ -1163,10 +1163,10 @@ export default function App() {
 
               <button
                 className="export-btn-large"
-                onClick={() => exportOfficesToExcel(reportOffices)}
+                onClick={() => exportOfficesToCSV(reportOffices)}
                 disabled={!reportOffices.length}
               >
-                📊 Exportar reporte a Excel ({reportOffices.length} oficinas)
+                📊 Exportar reporte a CSV ({reportOffices.length} oficinas)
               </button>
             </div>
           )}
