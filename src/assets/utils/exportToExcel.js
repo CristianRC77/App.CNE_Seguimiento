@@ -13,45 +13,53 @@ export const exportOfficesToExcel = async (offices) => {
   };
 
   // ============================================================
-  // ENCABEZADO CON LOGO Y TÍTULOS
+  // ENCABEZADO CON LOGO Y TÍTULOS (FILAS 1-3)
   // ============================================================
   
-  // Columnas A-B (1-2): Reservadas para logo (merged A1:B3)
+  // Columnas A-B (1-3): Reservadas para logo
   worksheet.mergeCells('A1:B3');
   const logoCell = worksheet.getCell('A1');
-  logoCell.value = '[LOGO]';
-  logoCell.font = { size: 10, color: { argb: 'FF666666' } };
+  logoCell.value = '[LOGO CNE]';
+  logoCell.font = { size: 10, bold: true, color: { argb: 'FF003366' } };
   logoCell.alignment = { horizontal: 'center', vertical: 'middle' };
   logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+  worksheet.getColumn('A').width = 20;
+  worksheet.getColumn('B').width = 15;
 
-  // Fila 1 (C1 hasta M): Título principal
-  worksheet.mergeCells('C1:M1');
+  // Fila 1 (C1 hasta última): Título principal - CONSEJO NACIONAL ELECTORAL
+  const lastCol = 20; // Aproximadamente hasta donde llega
+  worksheet.mergeCells(`C1:T1`);
   const titleCell = worksheet.getCell('C1');
   titleCell.value = 'CONSEJO NACIONAL ELECTORAL';
-  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
-  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
+  titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }; // Azul marino
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  worksheet.getRow(1).height = 25;
+  worksheet.getRow(1).height = 32;
 
-  // Fila 2 (C2 hasta M): Subtítulo
-  worksheet.mergeCells('C2:M2');
+  // Fila 2 (C2 hasta última): Subtítulo - Dirección de Procesos
+  worksheet.mergeCells('C2:T2');
   const subtitleCell = worksheet.getCell('C2');
   subtitleCell.value = 'Dirección de Procesos en el Exterior';
-  subtitleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-  subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(2).height = 22;
+  subtitleCell.font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCCCCC' } };
+  subtitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getRow(2).height = 18;
 
-  // Fila 3 (C3 hasta M): Fecha y hora
-  worksheet.mergeCells('C3:M3');
+  // Fila 3 (C3 hasta última): Fecha y hora
+  worksheet.mergeCells('C3:T3');
   const now = new Date();
-  const dateTimeStr = now.toLocaleDateString('es-ES') + ' - ' + now.toLocaleTimeString('es-ES');
+  const dateTimeStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
   const dateCell = worksheet.getCell('C3');
   dateCell.value = `Reporte de ${dateTimeStr}`;
-  dateCell.font = { italic: true, size: 11, color: { argb: 'FF333333' } };
+  dateCell.font = { italic: true, size: 10, color: { argb: 'FF000000' } };
   dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-  dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(3).height = 20;
+  dateCell.alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getRow(3).height = 15;
+
+  // ============================================================
+  // LÍNEA SEPARADORA (ROW 4)
+  // ============================================================
+  worksheet.getRow(4).height = 2;
 
   // ============================================================
   // ENCABEZADOS DE COLUMNA (ROW 5)
