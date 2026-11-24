@@ -21,7 +21,7 @@ import {
   getAuthToken,
   isTokenExpiringsoon,
 } from './assets/data/authService';
-import { exportOfficesToCSV } from './assets/utils/exportUtils';
+import { exportOfficesToExcel } from './assets/utils/exportToExcel';
 import Sidebar from './assets/components/Sidebar';
 import LoginModal from './assets/components/LoginModal';
 import DashboardHeader from './assets/components/DashboardHeader';
@@ -29,6 +29,7 @@ import MetricsGrid from './assets/components/MetricsGrid';
 import OverviewCharts from './assets/components/OverviewCharts';
 import OfficesTable from './assets/components/OfficesTable';
 import MilestoneEditor from './assets/components/MilestoneEditor';
+import AdminSection from './assets/components/AdminSection';
 import './App.css';
 
 // Determina el estado visual de una zona a partir de sus hitos y actas.
@@ -1162,11 +1163,18 @@ export default function App() {
 
               <button
                 className="export-btn-large"
-                onClick={() => exportOfficesToCSV(reportOffices)}
+                onClick={() => exportOfficesToExcel(reportOffices)}
                 disabled={!reportOffices.length}
               >
-                📄 Exportar reporte ({reportOffices.length} oficinas)
+                📊 Exportar reporte a Excel ({reportOffices.length} oficinas)
               </button>
+            </div>
+          )}
+
+          {/* Vista: ADMINISTRACIÓN */}
+          {activeTab === 'admin' && (
+            <div className="tab-view admin-container">
+              <AdminSection authSession={authSession} />
             </div>
           )}
         </section>

@@ -1,14 +1,17 @@
 /**
- * Vercel Serverless Function: POST /api/admin/setup
+ * Endpoint para crear usuario administrador
+ * POST /api/admin/setup
  * 
- * Endpoint para crear usuario administrador inicialmente
- * Requiere token de setup en variables de entorno
+ * Body: { setupToken: "setup-token-secreto" }
+ * 
+ * Este endpoint permite crear el usuario admin inicialmente.
+ * El token de setup evita que cualquiera cree usuarios admin.
  */
 
 import bcrypt from 'bcryptjs';
 import { getCollection } from '../mongodb.js';
 
-export default async function handler(req, res) {
+export default async function adminSetupHandler(req, res) {
   // Validar que sea POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido.' });
@@ -20,7 +23,7 @@ export default async function handler(req, res) {
 
     // Verificar token de seguridad
     if (!setupToken) {
-      console.error('❌ ADMIN_SETUP_TOKEN no está configurado en Vercel');
+      console.error('❌ ADMIN_SETUP_TOKEN no está configurado');
       return res.status(500).json({ error: 'Setup no está configurado en el servidor.' });
     }
 

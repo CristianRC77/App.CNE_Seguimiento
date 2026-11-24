@@ -1,4 +1,5 @@
 export const USER_ROLES = Object.freeze({
+  ADMIN: 'ADMIN',
   GENERAL: 'OPERARIO_GENERAL',
   CIRCUNSCRIPTION: 'OPERARIO_CIRC',
 });
@@ -32,6 +33,7 @@ export const USER_DOCUMENT_SCHEMA = {
 };
 
 export const normalizeUserRole = (role) => {
+  if (role === USER_ROLES.ADMIN) return USER_ROLES.ADMIN;
   if (role === USER_ROLES.GENERAL || role === generalRoleId) return USER_ROLES.GENERAL;
   if (role === USER_ROLES.CIRCUNSCRIPTION || role === circunscriptionRoleId) {
     return USER_ROLES.CIRCUNSCRIPTION;
@@ -69,6 +71,8 @@ export const isValidUserDocument = (user) => {
     return false;
   }
 
+  // Admin no necesita circunscripción
+  if (normalizedRole === USER_ROLES.ADMIN) return user.circunscripcion == null;
   if (normalizedRole === USER_ROLES.GENERAL) return user.circunscripcion == null;
 
   const normalizedCircunscription = normalizeCircunscriptionValue(user.circunscripcion);

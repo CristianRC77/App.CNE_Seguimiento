@@ -34,35 +34,35 @@
   border-right: 1px solid var(--line);
 }
 
-.logo-box {
+.logo-box { /* Contenedor del logo */
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 10px 38px;
+  gap: 11px; /* Espacio entre el logo y el nombre de la organización */
+  padding: 0 5px 30px; /* Espacio interno del contenedor del logo */
 }
 
 .logo-badge {
   display: grid;
-  width: 50px;
-  height: 50px;
+  width: 80px; /* Ancho del contenedor del logo */
+  height: 70px; /* Alto del contenedor del logo */
   place-items: center;
   color: #fff;
   /*background: var(--primary);*/
   border-radius: 9px;
-  font: 800 13px Manrope, sans-serif;
+  font: 800 13px Manrope, sans-serif; /* Estilo de fuente para el logo */
 }
 
 .logo-box h2 {
   margin: 0;
   color: var(--ink);
-  font: 800 14px Manrope, sans-serif;
+  font: 800 14px Manrope, sans-serif; /* Tamaño de fuente para el nombre de la organización */
 }
 
 .logo-box span {
   display: block;
-  margin-top: 2px;
+  margin-top: 2px; /* Espacio entre el nombre y la circunscripción */
   color: #95a0b2;
-  font-size: 10px;
+  font-size: 10px; /* Tamaño de fuente para la circunscripción */
 }
 
 .nav-menu {
@@ -560,8 +560,8 @@
 }
 .cne-logo-img {
   width: 55px;
-  height: 55px;
-  object-fit: contain;
+  height: 90px;
+  object-fit: contain; /* Mantener la proporción de la imagen */
 }
 .green-dot {
   display: inline-block;

@@ -65,6 +65,17 @@ export default function Sidebar({
         >
           📄 Reportes
         </button>
+        
+        {/* Botón de administración - Solo para ADMIN */}
+        {authSession && authSession.user.rol === 'ADMIN' && (
+          <button 
+            className={`nav-item admin-nav-item ${activeTab === 'admin' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('admin')}
+            title="Acceso exclusivo de administrador"
+          >
+            🔧 Administración
+          </button>
+        )}
       </nav>
 
       <div className="sidebar-bottom">
