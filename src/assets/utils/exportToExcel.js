@@ -1,248 +1,330 @@
-import ExcelJS from 'exceljs';
-import { statusInfo } from '../constants/cneConstants';
+import { statusInfo } from '../constants/cneConstants.js';
 
-export const exportOfficesToExcel = async (offices) => {
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Seguimiento CNE');
+const statusColumns = Object.entries(statusInfo);
 
-  // Configuración básica
-  worksheet.pageSetup = {
-    paperSize: 9,
-    orientation: 'landscape',
-    margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 }
-  };
-
-  // ============================================================
-  // ENCABEZADO CON LOGO Y TÍTULOS (FILAS 1-3)
-  // ============================================================
-  
-  // Columnas A-B (1-3): Reservadas para logo
-  worksheet.mergeCells('A1:B3');
-  const logoCell = worksheet.getCell('A1');
-  logoCell.value = '[LOGO CNE]';
-  logoCell.font = { size: 10, bold: true, color: { argb: 'FF003366' } };
-  logoCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
-  worksheet.getColumn('A').width = 20;
-  worksheet.getColumn('B').width = 15;
-
-  // Fila 1 (C1 hasta última): Título principal - CONSEJO NACIONAL ELECTORAL
-  const lastCol = 20; // Aproximadamente hasta donde llega
-  worksheet.mergeCells(`C1:T1`);
-  const titleCell = worksheet.getCell('C1');
-  titleCell.value = 'CONSEJO NACIONAL ELECTORAL';
-  titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
-  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }; // Azul marino
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  worksheet.getRow(1).height = 32;
-
-  // Fila 2 (C2 hasta última): Subtítulo - Dirección de Procesos
-  worksheet.mergeCells('C2:T2');
-  const subtitleCell = worksheet.getCell('C2');
-  subtitleCell.value = 'Dirección de Procesos en el Exterior';
-  subtitleCell.font = { bold: true, size: 12, color: { argb: 'FF000000' } };
-  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCCCCC' } };
-  subtitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
-  worksheet.getRow(2).height = 18;
-
-  // Fila 3 (C3 hasta última): Fecha y hora
-  worksheet.mergeCells('C3:T3');
-  const now = new Date();
-  const dateTimeStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-  const dateCell = worksheet.getCell('C3');
-  dateCell.value = `Reporte de ${dateTimeStr}`;
-  dateCell.font = { italic: true, size: 10, color: { argb: 'FF000000' } };
-  dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-  dateCell.alignment = { horizontal: 'left', vertical: 'middle' };
-  worksheet.getRow(3).height = 15;
-
-  // ============================================================
-  // LÍNEA SEPARADORA (ROW 4)
-  // ============================================================
-  worksheet.getRow(4).height = 2;
-
-  // ============================================================
-  // ENCABEZADOS DE COLUMNA (ROW 5)
-  // ============================================================
-  const statusColumns = Object.entries(statusInfo);
-  const headers = [
-    'Circunscripción', 'País', 'Oficina Consular', 'Zona Electoral',
-    'Juntas', 'Hombres', 'Mujeres', 'Tipo',
-    ...statusColumns.map(([, info]) => info.label),
-  ];
-
-  const headerRow = worksheet.getRow(5);
-  headers.forEach((header, index) => {
-    const cell = headerRow.getCell(index + 1);
-    cell.value = header;
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-  });
-  worksheet.getRow(5).height = 25;
-
-  // Agrupar datos por circunscripción
-  const groupedOffices = groupByCircunscripcion(offices);
-  let currentRow = 6;
-
-  // Recorrer cada circunscripción
-  for (const [circunscripcion, circOffices] of Object.entries(groupedOffices)) {
-    const startRow = currentRow;
-    let statusCounters = statusColumns.map(() => 0);
-
-    // Agregar datos de oficinas
-    circOffices.forEach((office) => {
-      const statusMarks = generateStatusMarks(office, statusColumns);
-      const rowData = [
-        circunscripcion,
-        office.country || '',
-        office.name || '',
-        office.zone || '',
-        office.juntas || 0,
-        office.juntasMen || 0,
-        office.juntasWomen || 0,
-        office.type || '',
-        ...statusMarks,
-      ];
-
-      const row = worksheet.getRow(currentRow);
-      rowData.forEach((value, index) => {
-        const cell = row.getCell(index + 1);
-        cell.value = value;
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-        
-        // Contar X en columnas de estado
-        if (index >= 8 && value === 'X') {
-          statusCounters[index - 8]++;
-        }
-      });
-      currentRow++;
-    });
-
-    // Fila de subtotal
-    const subtotalRow = worksheet.getRow(currentRow);
-    subtotalRow.getCell(1).value = `Subtotal - ${circunscripcion}`;
-    subtotalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    subtotalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-    subtotalRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-
-    // Sumar números (columnas 5, 6, 7)
-    [5, 6, 7].forEach((colNum) => {
-      let sum = 0;
-      for (let r = startRow; r < currentRow; r++) {
-        const val = worksheet.getRow(r).getCell(colNum).value;
-        sum += typeof val === 'number' ? val : 0;
-      }
-      const cell = subtotalRow.getCell(colNum);
-      cell.value = sum;
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-    });
-
-    // Sumar X por cada estado
-    statusColumns.forEach((_, index) => {
-      const cell = subtotalRow.getCell(9 + index);
-      cell.value = statusCounters[index];
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-    });
-
-    subtotalRow.height = 18;
-    currentRow++;
-  }
-
-  // Total General
-  const totalRow = worksheet.getRow(currentRow);
-  totalRow.getCell(1).value = 'TOTAL GENERAL';
-  totalRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-  totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-  totalRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-  // Totales generales
-  [5, 6, 7].forEach((colNum) => {
-    let sum = 0;
-    for (let r = 6; r < currentRow; r++) {
-      const val = worksheet.getRow(r).getCell(colNum).value;
-      sum += typeof val === 'number' ? val : 0;
-    }
-    const cell = totalRow.getCell(colNum);
-    cell.value = sum;
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-  });
-
-  // Total X por estado
-  statusColumns.forEach((_, index) => {
-    let totalX = 0;
-    for (let r = 6; r < currentRow; r++) {
-      const val = worksheet.getRow(r).getCell(9 + index).value;
-      totalX += typeof val === 'number' ? val : 0;
-    }
-    const cell = totalRow.getCell(9 + index);
-    cell.value = totalX;
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-  });
-
-  totalRow.height = 20;
-
-  // Ajustar anchos de columnas
-  worksheet.columns = [
-    { width: 20 }, { width: 15 }, { width: 22 }, { width: 15 },
-    { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 },
-    ...statusColumns.map(() => ({ width: 12 })),
-  ];
-
-  // Generar y descargar
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `reporte-cne-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
-function groupByCircunscripcion(offices) {
-  return offices.reduce((acc, office) => {
-    const circunscripcion = office.circunscription || 'Sin Circunscripción';
-    if (!acc[circunscripcion]) acc[circunscripcion] = [];
-    acc[circunscripcion].push(office);
-    return acc;
-  }, {});
-}
-
-function generateStatusMarks(office, statusColumns) {
-  const currentStatus = getOfficeStatus(office);
-  const currentStatusIndex = statusColumns.findIndex(([status]) => status === currentStatus);
-
-  return statusColumns.map(([status], index) => {
-    if (status === 'sinEmpezar') {
-      return currentStatus === 'sinEmpezar' ? 'X' : '-';
-    }
-    if (currentStatus === 'finalizado' || index <= currentStatusIndex) return 'X';
-    return '-';
-  });
-}
-
-function getOfficeStatus(office) {
+const getOfficeStatus = (office) => {
   const completed = Object.values(office.milestones || {}).filter(Boolean).length;
   if (completed >= 6) return 'finalizado';
   if (completed === 5) return 'digitalizacion';
   if (completed >= 3) return 'cierre';
   if (completed === 0) return 'sinEmpezar';
   return 'instalacion';
-}
+};
+
+const getStatusMarks = (office) => {
+  const currentStatus = getOfficeStatus(office);
+  const currentIndex = statusColumns.findIndex(([status]) => status === currentStatus);
+  return statusColumns.map(([status], index) => {
+    if (status === 'sinEmpezar') return currentStatus === 'sinEmpezar' ? 'X' : '-';
+    if (currentStatus === 'finalizado' || index <= currentIndex) return 'X';
+    return '-';
+  });
+};
+
+const groupByCircunscripcion = (offices) =>
+  offices.reduce((acc, office) => {
+    const circ = office.circunscription || office.circunscripcion || 'Sin Circunscripción';
+    if (!acc[circ]) acc[circ] = [];
+    acc[circ].push(office);
+    return acc;
+  }, {});
+
+const colLetter = (n) => {
+  let s = '';
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+};
+
+export const exportOfficesToExcel = async (offices) => {
+  try {
+    const exceljsModule = await import('exceljs');
+    const ExcelJS = exceljsModule.default ?? exceljsModule;
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CNE - Seguimiento';
+    workbook.created = new Date();
+
+    // ── Colores ──────────────────────────────────────────────────
+    const NAVY      = 'FF1B3A6B';
+    const WHITE     = 'FFFFFFFF';
+    const GRAY_BG   = 'FFF5F7FA';  // fondo suave subtítulo/fecha
+    const INFO_BG   = 'FFF0F4FA';  // barra de info
+    const GREEN     = 'FF00783C';
+    const GRAY_X    = 'FFA0A0A0';
+    const ROW_ALT   = 'FFF7F9FC';
+    const SUBTOTAL  = 'FFE6EBF5';
+    const GRID      = 'FFD0D8E4';
+    const DARK_GRID = 'FF8899AA';
+    const TEXT      = 'FF1E1E1E';
+    const NAVY_TEXT = 'FF1B3A6B';
+    const BLACK     = 'FF000000';
+
+    // ── Definición de columnas ────────────────────────────────────
+    const headers    = ['Circunscripción','País','Oficina','Zona','Juntas','H','M','Tipo',
+                        'S.E','Inst','Cierre','Digit','Final'];
+    const colCount   = headers.length;        // 13
+    const lastCol    = colLetter(colCount);   // M
+    const logoEnd    = colLetter(3);          // C  — logo en A:C
+    const titleStart = colLetter(4);          // D  — texto en D:M
+    const colAligns  = ['left','left','left','left','center','center','center','center',
+                        'center','center','center','center','center'];
+    const widths     = [26, 16, 24, 16, 8, 5, 5, 12, 6, 6, 8, 8, 8];
+
+    const worksheet = workbook.addWorksheet('Reporte', {
+      views: [{ state: 'frozen', ySplit: 5 }],
+      pageSetup: {
+        paperSize: 9,
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+      },
+      headerFooter: {
+        oddFooter: '&LConsejo Nacional Electoral&R&P de &N',
+      },
+    });
+
+    widths.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+
+    const thinBorder = (color = GRID) => ({
+      top:    { style: 'thin', color: { argb: color } },
+      bottom: { style: 'thin', color: { argb: color } },
+      left:   { style: 'thin', color: { argb: color } },
+      right:  { style: 'thin', color: { argb: color } },
+    });
+
+    const fillRow = (rn, color) => {
+      const r = worksheet.getRow(rn);
+      for (let i = 1; i <= colCount; i++)
+        r.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    };
+
+    // ================================================================
+    // ENCABEZADO  (filas 1-3)
+    //
+    //  A──C (logo)   |  D──────────────────────────── M
+    //  ┌─────────────┼──────────────────────────────────┐
+    //  │             │  CONSEJO NACIONAL ELECTORAL       │  fila 1 — alto 60, blanco
+    //  │  LOGO CNE   ├──────────────────────────────────┤
+    //  │             │  Dirección de Procesos...  (bold) │  fila 2 — gris suave
+    //  │             │  Reporte de seguimiento... (ital) │  fila 3 — gris suave
+    //  └─────────────┴──────────────────────────────────┘
+    //  Fecha generación: ...          Total oficinas: N    fila 4 — info
+    //  Circunscripción | País | ...                        fila 5 — cabecera tabla
+    // ================================================================
+
+    // Alturas de filas del encabezado
+    worksheet.getRow(1).height = 30;
+    worksheet.getRow(2).height = 22;
+    worksheet.getRow(3).height = 18;
+
+    // Fondo blanco explícito en las 3 filas para todas las columnas
+    [1, 2, 3].forEach((rn) => fillRow(rn, WHITE));
+
+    // ── Logo: A1:A3 — columna A, filas 1-3 unidas ────────────
+    worksheet.mergeCells('A1:A3');
+    const logoAreaCell = worksheet.getCell('A1');
+    logoAreaCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
+    logoAreaCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // ── Título: B1:M1 — negro, fondo blanco, centrado ────────
+    worksheet.mergeCells(`B1:${lastCol}1`);
+    const titleCell = worksheet.getCell('B1');
+    titleCell.value     = 'CONSEJO NACIONAL ELECTORAL';
+    titleCell.font      = { bold: true, size: 22, color: { argb: BLACK }, name: 'Calibri' };
+    titleCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // ── Subtítulo: B2:M2 — negrita azul, fondo gris suave ────
+    worksheet.mergeCells(`B2:${lastCol}2`);
+    const subCell = worksheet.getCell('B2');
+    subCell.value     = 'Dirección de Procesos en el Exterior';
+    subCell.font      = { bold: true, size: 14, color: { argb: NAVY_TEXT }, name: 'Calibri' };
+    subCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
+    subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // ── Texto seguimiento: B3:M3 — itálica gris, mismo fondo ─
+    worksheet.mergeCells(`B3:${lastCol}3`);
+    const trackCell = worksheet.getCell('B3');
+    trackCell.value     = 'Reporte de seguimiento de zonas electorales';
+    trackCell.font      = { italic: true, size: 10, color: { argb: 'FF666666' }, name: 'Calibri' };
+    trackCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: GRAY_BG } };
+    trackCell.alignment = { horizontal: 'center', vertical: 'middle'};
+
+    // ── Fecha/hora ────────────────────────────────────────────
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const dateTimeStr =
+      `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ` +
+      `- ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    // ── Fila 4: barra de información — blanca con borde inferior
+    worksheet.getRow(4).height = 18;
+    fillRow(4, WHITE);
+
+    const infoSplit = colLetter(8);
+    const infoNext  = colLetter(9);
+    worksheet.mergeCells(`A4:${infoSplit}4`);
+    worksheet.mergeCells(`${infoNext}4:${lastCol}4`);
+
+    const infoL = worksheet.getCell('A4');
+    infoL.value     = `Fecha de generación: ${dateTimeStr}`;
+    infoL.font      = { bold: true, size: 10, color: { argb: NAVY_TEXT } };
+    infoL.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    infoL.border    = { bottom: { style: 'thin', color: { argb: GRID } } };
+
+    const infoR = worksheet.getCell(`${infoNext}4`);
+    infoR.value     = `Total de oficinas: ${offices.length}`;
+    infoR.font      = { size: 10, color: { argb: TEXT } };
+    infoR.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+    infoR.border    = { bottom: { style: 'thin', color: { argb: GRID } } };
+
+    // ── Fila 5: cabecera de columnas (freeze aquí) ────────────
+    worksheet.getRow(5).height = 22;
+    headers.forEach((label, i) => {
+      const cell = worksheet.getRow(5).getCell(i + 1);
+      cell.value     = label;
+      cell.font      = { bold: true, size: 10, color: { argb: WHITE } };
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+      cell.alignment = { horizontal: colAligns[i], vertical: 'middle',
+                         indent: colAligns[i] === 'left' ? 1 : 0 };
+      cell.border    = thinBorder(DARK_GRID);
+    });
+
+    // ── Logo: imagen dentro de A1:A3 ─────────────────────────
+    // Original 1070×535 px (ratio 2:1). Columna A ≈ 65px ancho × 100px alto.
+    // Usamos 110×55 px para que quepa proporcional en la columna A.
+    try {
+      const logoResp = await fetch('/images/logo-cne1.png');
+      if (logoResp.ok) {
+        const logoBuffer = await logoResp.arrayBuffer();
+        const logoId = workbook.addImage({ buffer: logoBuffer, extension: 'png' });
+        worksheet.addImage(logoId, {
+          tl: { col: 0, row: 0, colOff: 20000, rowOff: 50000 },
+          ext: { width:220, height: 100 },
+          editAs: 'oneCell',
+        });
+      }
+    } catch (e) {
+      console.warn('No se pudo cargar el logo:', e.message);
+    }
+
+    // ================================================================
+    // CUERPO DE LA TABLA (desde fila 6)
+    // ================================================================
+    const groupedOffices = groupByCircunscripcion(offices);
+    let rowNum = 6;
+    let alt    = 0;
+
+    let grandJuntas = 0, grandH = 0, grandM = 0;
+    let grandSE = 0, grandInst = 0, grandCierre = 0, grandDigit = 0, grandFinal = 0;
+
+    const writeCell = (cell, value, ci, { isStatus = false, bg = null, bold = false } = {}) => {
+      cell.value = value;
+      if (isStatus) {
+        const isX = value === 'X';
+        cell.font = { bold: isX, size: 10, color: { argb: isX ? GREEN : GRAY_X } };
+      } else {
+        cell.font = { size: 10, bold, color: { argb: TEXT } };
+      }
+      const align = colAligns[ci];
+      cell.alignment = { horizontal: align, vertical: 'middle', indent: align === 'left' ? 1 : 0 };
+      if (bg) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = thinBorder();
+    };
+
+    for (const [circunscripcion, circOffices] of Object.entries(groupedOffices)) {
+      let juntas = 0, hombres = 0, mujeres = 0;
+      let countSE = 0, countInst = 0, countCierre = 0, countDigit = 0, countFinal = 0;
+
+      circOffices.forEach((office) => {
+        juntas  += Number(office.juntas)  || 0;
+        hombres += Number(office.juntasMen   || office.hombres) || 0;
+        mujeres += Number(office.juntasWomen || office.mujeres) || 0;
+
+        const marks = getStatusMarks(office);
+        if (marks[0] === 'X') countSE++;
+        if (marks[1] === 'X') countInst++;
+        if (marks[2] === 'X') countCierre++;
+        if (marks[3] === 'X') countDigit++;
+        if (marks[4] === 'X') countFinal++;
+
+        const bg  = alt % 2 === 0 ? ROW_ALT : WHITE;
+        const row = worksheet.getRow(rowNum);
+        [
+          circunscripcion,
+          office.country || office.pais || '',
+          office.name    || office.oficina || '',
+          office.zone    || '',
+          office.juntas  || 0,
+          office.juntasMen   || office.hombres  || 0,
+          office.juntasWomen || office.mujeres || 0,
+          office.type    || office.tipo || '',
+          marks[0], marks[1], marks[2], marks[3], marks[4],
+        ].forEach((val, ci) => writeCell(row.getCell(ci + 1), val, ci, { isStatus: ci >= 8, bg }));
+
+        worksheet.getRow(rowNum).height = 16;
+        rowNum++;
+        alt++;
+      });
+
+      // ── Subtotal circunscripción ──────────────────────────────
+      const sub = worksheet.getRow(rowNum);
+      [
+        `Subtotal ${circunscripcion}`, '', '', '',
+        juntas, hombres, mujeres, '',
+        countSE, countInst, countCierre, countDigit, countFinal,
+      ].forEach((val, ci) => writeCell(sub.getCell(ci + 1), val, ci, { bg: SUBTOTAL, bold: true }));
+      worksheet.getRow(rowNum).height = 18;
+      rowNum++;
+
+      grandJuntas += juntas;   grandH += hombres;   grandM += mujeres;
+      grandSE     += countSE;  grandInst  += countInst;  grandCierre += countCierre;
+      grandDigit  += countDigit; grandFinal += countFinal;
+    }
+
+    // ── Total general ─────────────────────────────────────────
+    rowNum++;
+    const total = worksheet.getRow(rowNum);
+    ['TOTAL GENERAL', '', '', '',
+     grandJuntas, grandH, grandM, '',
+     grandSE, grandInst, grandCierre, grandDigit, grandFinal,
+    ].forEach((val, ci) => {
+      const cell = total.getCell(ci + 1);
+      cell.value     = val;
+      cell.font      = { bold: true, size: 11, color: { argb: WHITE } };
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+      cell.alignment = { horizontal: colAligns[ci], vertical: 'middle',
+                         indent: colAligns[ci] === 'left' ? 1 : 0 };
+      cell.border    = thinBorder(DARK_GRID);
+    });
+    worksheet.getRow(rowNum).height = 22;
+
+    // Franja dorada de cierre
+    fillRow(rowNum + 1, 'FFD4AF37');
+    worksheet.getRow(rowNum + 1).height = 3;
+
+    // ================================================================
+    // DESCARGA
+    // ================================================================
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob   = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href  = url;
+    link.download = `reporte-cne-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error('Error al generar Excel:', error);
+    alert('Error al generar Excel: ' + error.message);
+  }
+};

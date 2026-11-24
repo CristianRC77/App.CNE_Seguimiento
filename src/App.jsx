@@ -23,6 +23,7 @@ import {
 } from './assets/data/authService';
 import { exportOfficesToCSV } from './assets/utils/exportUtils';
 import { exportOfficesToPDF } from './assets/utils/exportToPDF';
+import { exportOfficesToExcel } from './assets/utils/exportToExcel';
 import Sidebar from './assets/components/Sidebar';
 import LoginModal from './assets/components/LoginModal';
 import DashboardHeader from './assets/components/DashboardHeader';
@@ -305,7 +306,10 @@ export default function App() {
   const saveSequenceRef = useRef(0);
   // La fuente completa se conserva, pero esta lista alimenta las vistas operativas.
   const participatingOffices = offices.filter((office) => !isExcludedFromGeneralPercentage(office));
-  const editableOffices = authSession?.user.rol === USER_ROLES.GENERAL
+  const editableOffices = (
+    authSession?.user.rol === USER_ROLES.GENERAL ||
+    authSession?.user.rol === 'ADMIN'
+  )
     ? participatingOffices
     : participatingOffices.filter((office) => (
       normalizeCircunscription(office.circunscription)
@@ -1177,6 +1181,14 @@ export default function App() {
                   style={{ backgroundColor: '#d32f2f' }}
                 >
                   📋 Exportar a PDF ({reportOffices.length} oficinas)
+                </button>
+                <button
+                  className="export-btn-large"
+                  onClick={() => exportOfficesToExcel(reportOffices)}
+                  disabled={!reportOffices.length}
+                  style={{ backgroundColor: '#217346' }}
+                >
+                  📊 Exportar a Excel ({reportOffices.length} oficinas)
                 </button>
               </div>
             </div>

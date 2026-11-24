@@ -137,7 +137,7 @@ const getZoneCircunscription = async (documents) => {
 };
 
 export const authorizeZoneUpdates = async (request, response, next) => {
-  if (request.user?.rol === USER_ROLES.GENERAL) {
+  if (request.user?.rol === USER_ROLES.GENERAL || request.user?.rol === USER_ROLES.ADMIN) {
     next();
     return;
   }

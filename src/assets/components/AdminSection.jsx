@@ -13,7 +13,7 @@ export default function AdminSection({ authSession }) {
   }
 
   const handleResetDatabase = async () => {
-    if (confirmationInput !== 'ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE') {
+    if (confirmationInput !== 'REINICIAR') {
       setMessage('❌ Código de confirmación inválido');
       return;
     }
@@ -30,19 +30,18 @@ export default function AdminSection({ authSession }) {
           'Authorization': `Bearer ${authSession.token}`,
         },
         body: JSON.stringify({
-          confirmationPhrase: 'ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE',
+          confirmationPhrase: 'REINICIAR',
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`✅ ${data.message}\n\nSe eliminaron: ${data.deletedCount} registros`);
+        setMessage(`✅ ${data.message}`);
         setConfirmationInput('');
         setTimeout(() => {
           setShowResetModal(false);
           setMessage('');
-          // Recargar la página
           window.location.reload();
         }, 3000);
       } else {
@@ -68,9 +67,9 @@ export default function AdminSection({ authSession }) {
           <button
             className="admin-btn reset-btn"
             onClick={() => setShowResetModal(true)}
-            title="Limpiar todos los datos de seguimiento"
+            title="Reiniciar todos los avances de seguimiento a cero"
           >
-            🗑️ Vaciar Base de Datos
+            🔄 Reiniciar Seguimiento
           </button>
         </div>
       </div>
@@ -80,7 +79,7 @@ export default function AdminSection({ authSession }) {
         <div className="modal-overlay" onClick={() => !loading && setShowResetModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>⚠️ Vaciar Base de Datos</h2>
+              <h2>⚠️ Reiniciar Seguimiento</h2>
               <button
                 className="close-btn"
                 onClick={() => !loading && setShowResetModal(false)}
@@ -93,33 +92,33 @@ export default function AdminSection({ authSession }) {
             {/* Advertencia principal */}
             <div className="warning-box">
               <p>
-                <strong>⚠️ ATENCIÓN:</strong> Esta acción eliminará <strong>TODOS</strong> los datos
-                de seguimiento de la aplicación. <strong>Esta acción NO se puede deshacer</strong>.
+                <strong>⚠️ ATENCIÓN:</strong> Esta acción pondrá todos los hitos y actas
+                de <strong>TODAS</strong> las zonas electorales en cero.
+                Los documentos <strong>NO se eliminan</strong>; solo se reinician los avances.
               </p>
             </div>
 
             {/* Información */}
             <div className="info-section">
-              <h4>Paso 1: Verifica qué se eliminará</h4>
+              <h4>Paso 1: Verifica qué se reiniciará</h4>
               <ul className="info-list">
-                <li>✓ Todos los registros de zonas electorales</li>
-                <li>✓ Todos los datos de seguimiento</li>
-                <li>✓ Todos los hitos completados</li>
-                <li>✗ Los usuarios NO serán eliminados</li>
-                <li>✗ La configuración de marca NO será eliminada</li>
+                <li>✓ Todos los hitos completados → false</li>
+                <li>✓ Todas las actas digitalizadas → vacías</li>
+                <li>✓ Progreso de cada zona → 0%</li>
+                <li>✗ Los documentos de zonas NO serán eliminados</li>
+                <li>✗ Los usuarios NO serán afectados</li>
+                <li>✗ La configuración de marca NO será modificada</li>
               </ul>
 
               <h4>Paso 2: Ingresa el código de confirmación</h4>
               <p className="confirmation-hint-text">
-                Para evitar borrados accidentales, copia y pega el siguiente código:
+                Para evitar reinicios accidentales, copia y pega el siguiente código:
               </p>
               <div className="code-box">
-                <code>ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE</code>
+                <code>REINICIAR</code>
                 <button
                   className="copy-btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText('ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE');
-                  }}
+                  onClick={() => navigator.clipboard.writeText('REINICIAR')}
                   title="Copiar al portapapeles"
                 >
                   📋
@@ -132,12 +131,12 @@ export default function AdminSection({ authSession }) {
                 value={confirmationInput}
                 onChange={(e) => setConfirmationInput(e.target.value)}
                 className={`confirmation-input ${
-                  confirmationInput === 'ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE' ? 'valid' : ''
+                  confirmationInput === 'REINICIAR' ? 'valid' : ''
                 }`}
                 disabled={loading}
               />
 
-              {confirmationInput === 'ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE' && (
+              {confirmationInput === 'REINICIAR' && (
                 <div className="validation-success">✅ Código correcto</div>
               )}
             </div>
@@ -171,12 +170,9 @@ export default function AdminSection({ authSession }) {
               <button
                 className="btn btn-danger"
                 onClick={handleResetDatabase}
-                disabled={
-                  loading ||
-                  confirmationInput !== 'ELIMINAR_TODOS_LOS_DATOS_PERMANENTEMENTE'
-                }
+                disabled={loading || confirmationInput !== 'REINICIAR'}
               >
-                {loading ? '⏳ Procesando...' : '🗑️ Eliminar Todos los Datos'}
+                {loading ? '⏳ Procesando...' : '🔄 Reiniciar Seguimiento'}
               </button>
             </div>
 
