@@ -65,7 +65,7 @@ export const exportOfficesToExcel = async (offices) => {
 
     // ── Definición de columnas ────────────────────────────────────
     const headers    = ['Circunscripción','País','Oficina','Zona','Juntas','H','M','Tipo',
-                        'S.E','Inst','Cierre','Digit','Final'];
+                        ' I.','Insta','Escrut','Digit','Compl'];
     const colCount   = headers.length;        // 13
     const lastCol    = colLetter(colCount);   // M
     const logoEnd    = colLetter(3);          // C  — logo en A:C

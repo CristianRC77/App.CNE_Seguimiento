@@ -132,11 +132,11 @@ export const exportOfficesToPDF = (offices) => {
       { key: 'men',      label: 'H',               width: 9,  align: 'center' },
       { key: 'women',    label: 'M',               width: 9,  align: 'center' },
       { key: 'type',     label: 'Tipo',            width: 16, align: 'center' },
-      { key: 'se',       label: 'S.E',             width: 10, align: 'center' },
+      { key: 'se',       label: 'S. I.',             width: 10, align: 'center' },
       { key: 'inst',     label: 'Inst',            width: 10, align: 'center' },
-      { key: 'cierre',   label: 'Cierre',          width: 12, align: 'center' },
-      { key: 'digit',    label: 'Digit',           width: 12, align: 'center' },
-      { key: 'final',    label: 'Final',           width: 12, align: 'center' },
+      { key: 'cierre',   label: 'Escrut',          width: 12, align: 'center' },
+      { key: 'digit',    label: 'Digital',           width: 12, align: 'center' },
+      { key: 'final',    label: 'Compl',           width: 12, align: 'center' },
     ];
 
     const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
