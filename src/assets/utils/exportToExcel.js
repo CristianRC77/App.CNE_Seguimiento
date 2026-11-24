@@ -12,7 +12,50 @@ export const exportOfficesToExcel = async (offices) => {
     margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 }
   };
 
-  // Encabezados
+  // ============================================================
+  // ENCABEZADO CON LOGO Y TÍTULOS
+  // ============================================================
+  
+  // Columnas A-B (1-2): Reservadas para logo (merged A1:B3)
+  worksheet.mergeCells('A1:B3');
+  const logoCell = worksheet.getCell('A1');
+  logoCell.value = '[LOGO]';
+  logoCell.font = { size: 10, color: { argb: 'FF666666' } };
+  logoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+
+  // Fila 1 (C1 hasta M): Título principal
+  worksheet.mergeCells('C1:M1');
+  const titleCell = worksheet.getCell('C1');
+  titleCell.value = 'CONSEJO NACIONAL ELECTORAL';
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  worksheet.getRow(1).height = 25;
+
+  // Fila 2 (C2 hasta M): Subtítulo
+  worksheet.mergeCells('C2:M2');
+  const subtitleCell = worksheet.getCell('C2');
+  subtitleCell.value = 'Dirección de Procesos en el Exterior';
+  subtitleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
+  subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 22;
+
+  // Fila 3 (C3 hasta M): Fecha y hora
+  worksheet.mergeCells('C3:M3');
+  const now = new Date();
+  const dateTimeStr = now.toLocaleDateString('es-ES') + ' - ' + now.toLocaleTimeString('es-ES');
+  const dateCell = worksheet.getCell('C3');
+  dateCell.value = `Reporte de ${dateTimeStr}`;
+  dateCell.font = { italic: true, size: 11, color: { argb: 'FF333333' } };
+  dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+  dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(3).height = 20;
+
+  // ============================================================
+  // ENCABEZADOS DE COLUMNA (ROW 5)
+  // ============================================================
   const statusColumns = Object.entries(statusInfo);
   const headers = [
     'Circunscripción', 'País', 'Oficina Consular', 'Zona Electoral',
@@ -20,27 +63,6 @@ export const exportOfficesToExcel = async (offices) => {
     ...statusColumns.map(([, info]) => info.label),
   ];
 
-  // Fila 1: Título
-  worksheet.getCell('A1').value = 'CONSEJO NACIONAL ELECTORAL';
-  worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
-  worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-  worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(1).height = 22;
-
-  // Fila 2: Subtítulo
-  worksheet.getCell('A2').value = 'Dirección de Procesos en el Exterior';
-  worksheet.getCell('A2').font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-  worksheet.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-  worksheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(2).height = 20;
-
-  // Fila 3: Fecha
-  worksheet.getCell('A3').value = `Reporte de ${new Date().toLocaleDateString('es-ES')}`;
-  worksheet.getCell('A3').font = { italic: true, size: 10 };
-  worksheet.getCell('A3').alignment = { horizontal: 'center' };
-  worksheet.getRow(3).height = 15;
-
-  // Fila 4: Headers
   const headerRow = worksheet.getRow(5);
   headers.forEach((header, index) => {
     const cell = headerRow.getCell(index + 1);
