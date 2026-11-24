@@ -57,20 +57,18 @@ export const exportOfficesToPDF = (offices) => {
     // TABLA DE DATOS - MEJOR ESPACIADA
     // ============================================================
     
-    const statusColumns = Object.entries(statusInfo);
+    // Posiciones de columnas (ajustadas a A4 landscape)
+    const colX = [12, 32, 50, 68, 85, 95, 105, 115, 125, 135, 145, 155, 165, 175, 185, 195];
+    const colWidths = [18, 16, 16, 15, 12, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8];
     
-    // Posiciones de columnas (mejor distribuidas)
-    const colX = [12, 28, 48, 68, 85, 95, 105, 115, 125];
-    const colWidths = [15, 18, 18, 15, 10, 8, 8, 8, 8];
-    
-    const headers = ['Circunscripción', 'País', 'Oficina', 'Zona', 'Juntas', 'H', 'M', 'Tipo', 'Estado'];
+    const headers = ['Circunscripción', 'País', 'Oficina', 'Zona', 'Juntas', 'H', 'M', 'Tipo', 'S.E', 'Inst', 'Cierre', 'Digit', 'Final'];
     
     // Encabezados de tabla
     doc.setFillColor(31, 78, 120);
     doc.rect(12, currentY, pageWidth - 24, 7, 'F');
     
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
     
     headers.forEach((header, idx) => {
@@ -98,14 +96,14 @@ export const exportOfficesToPDF = (offices) => {
         doc.rect(12, currentY, pageWidth - 24, 5, 'F');
         
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setTextColor(30, 30, 30);
         
         // Texto - mejor proporcionado
-        const circ = circunscripcion.substring(0, 12);
-        const country = (office.country || '').substring(0, 15);
-        const name = (office.name || '').substring(0, 15);
-        const zone = (office.zone || '').substring(0, 12);
+        const circ = circunscripcion.substring(0, 15);
+        const country = (office.country || '').substring(0, 12);
+        const name = (office.name || '').substring(0, 12);
+        const zone = (office.zone || '').substring(0, 10);
         const type = (office.type || '').substring(0, 6);
         
         doc.text(circ, colX[0], currentY + 3.2, { maxWidth: colWidths[0] - 1, align: 'left' });
@@ -128,7 +126,7 @@ export const exportOfficesToPDF = (offices) => {
           doc.setFillColor(31, 78, 120);
           doc.rect(12, 10, pageWidth - 24, 7, 'F');
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
+          doc.setFontSize(8);
           doc.setTextColor(255, 255, 255);
           headers.forEach((header, idx) => {
             doc.text(header, colX[idx], 13.5, { maxWidth: colWidths[idx] - 1, align: 'center' });
@@ -143,7 +141,7 @@ export const exportOfficesToPDF = (offices) => {
       doc.rect(12, currentY, pageWidth - 24, 5.5, 'F');
       
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(0, 0, 0);
       
       doc.text(`Subtotal: ${circunscripcion}`, colX[0], currentY + 3.2, { maxWidth: 50 });
@@ -161,7 +159,7 @@ export const exportOfficesToPDF = (offices) => {
         doc.setFillColor(31, 78, 120);
         doc.rect(12, 10, pageWidth - 24, 7, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
         headers.forEach((header, idx) => {
           doc.text(header, colX[idx], 13.5, { maxWidth: colWidths[idx] - 1, align: 'center' });
