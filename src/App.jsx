@@ -22,6 +22,7 @@ import {
   isTokenExpiringsoon,
 } from './assets/data/authService';
 import { exportOfficesToCSV } from './assets/utils/exportUtils';
+import { exportOfficesToPDF } from './assets/utils/exportToPDF';
 import Sidebar from './assets/components/Sidebar';
 import LoginModal from './assets/components/LoginModal';
 import DashboardHeader from './assets/components/DashboardHeader';
@@ -1161,13 +1162,23 @@ export default function App() {
                 ))}
               </div>
 
-              <button
-                className="export-btn-large"
-                onClick={() => exportOfficesToCSV(reportOffices)}
-                disabled={!reportOffices.length}
-              >
-                📊 Exportar reporte a CSV ({reportOffices.length} oficinas)
-              </button>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  className="export-btn-large"
+                  onClick={() => exportOfficesToCSV(reportOffices)}
+                  disabled={!reportOffices.length}
+                >
+                  📄 Exportar a CSV ({reportOffices.length} oficinas)
+                </button>
+                <button
+                  className="export-btn-large"
+                  onClick={() => exportOfficesToPDF(reportOffices)}
+                  disabled={!reportOffices.length}
+                  style={{ backgroundColor: '#d32f2f' }}
+                >
+                  📋 Exportar a PDF ({reportOffices.length} oficinas)
+                </button>
+              </div>
             </div>
           )}
 
