@@ -1,78 +1,18 @@
 import ExcelJS from 'exceljs';
 import { statusInfo } from '../constants/cneConstants';
 
-/**
- * Exporta datos a Excel con formato institucional CNE
- * Incluye logo, encabezados, datos agrupados por circunscripción,
- * subtotales y total general con fórmulas dinámicas
- */
 export const exportOfficesToExcel = async (offices) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Seguimiento CNE');
 
-  // ============================================================
-  // 1. CONFIGURACIÓN INICIAL
-  // ============================================================
+  // Configuración básica
   worksheet.pageSetup = {
     paperSize: 9,
     orientation: 'landscape',
-    margins: { left: 0.5, right: 0.5, top: 1, bottom: 1 }
+    margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 }
   };
 
-  // ============================================================
-  // 2. INSERTAR LOGO (ROW 1-3)
-  // ============================================================
-  // Intentar cargar el logo - deshabilitado por ahora para evitar errores
-  /*
-  try {
-    const logoPath = '/images/logo-cne.png';
-    const response = await fetch(logoPath);
-    if (response.ok) {
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const imageId = workbook.addImage({
-        buffer: arrayBuffer,
-        extension: 'png',
-      });
-      worksheet.addImage(imageId, 'A1:B3');
-    }
-  } catch (error) {
-    console.warn('No se pudo cargar el logo, continuando sin imagen');
-  }
-  */
-
-  // ============================================================
-  // 3. ENCABEZADOS (ROW 1-3, COL C-H)
-  // ============================================================
-  // Combinar celdas para el título principal
-  worksheet.mergeCells('A1:M1'); // 
-  const titleCell = worksheet.getCell('A1');
-  titleCell.value = 'CONSEJO NACIONAL ELECTORAL';
-  titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
-  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  worksheet.getRow(1).height = 25;
-
-  // Subtítulo
-  worksheet.mergeCells('C2:M2');
-  const subtitleCell = worksheet.getCell('C2');
-  subtitleCell.value = 'Dirección de Procesos en el Exterior';
-  subtitleCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-  subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(2).height = 20;
-
-  // Fecha del reporte
-  worksheet.mergeCells('A3:H3');
-  const dateCell = worksheet.getCell('A3');
-  dateCell.value = `Reporte de Seguimiento - ${new Date().toLocaleDateString('es-ES')}`;
-  dateCell.font = { italic: true, size: 10 };
-  dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(3).height = 15;
-
-  // ============================================================
-  // 4. ENCABEZADOS DE COLUMNA (ROW 4)
-  // ============================================================
+  // Encabezados
   const statusColumns = Object.entries(statusInfo);
   const headers = [
     'Circunscripción', 'País', 'Oficina Consular', 'Zona Electoral',
@@ -80,31 +20,48 @@ export const exportOfficesToExcel = async (offices) => {
     ...statusColumns.map(([, info]) => info.label),
   ];
 
+  // Fila 1: Título
+  worksheet.getCell('A1').value = 'CONSEJO NACIONAL ELECTORAL';
+  worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+  worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
+  worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 22;
+
+  // Fila 2: Subtítulo
+  worksheet.getCell('A2').value = 'Dirección de Procesos en el Exterior';
+  worksheet.getCell('A2').font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  worksheet.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
+  worksheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 20;
+
+  // Fila 3: Fecha
+  worksheet.getCell('A3').value = `Reporte de ${new Date().toLocaleDateString('es-ES')}`;
+  worksheet.getCell('A3').font = { italic: true, size: 10 };
+  worksheet.getCell('A3').alignment = { horizontal: 'center' };
+  worksheet.getRow(3).height = 15;
+
+  // Fila 4: Headers
   const headerRow = worksheet.getRow(5);
   headers.forEach((header, index) => {
     const cell = headerRow.getCell(index + 1);
     cell.value = header;
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   });
   worksheet.getRow(5).height = 25;
 
-  // ============================================================
-  // 5. DATOS AGRUPADOS POR CIRCUNSCRIPCIÓN
-  // ============================================================
+  // Agrupar datos por circunscripción
   const groupedOffices = groupByCircunscripcion(offices);
   let currentRow = 6;
-  let grandTotalRow = null;
-  const totalsMap = new Map(); // Para almacenar filas de subtotal
 
-  // Columnas numéricas para sumar
-  const numericColumns = [5, 6, 7]; // Juntas, Hombres, Mujeres
-
+  // Recorrer cada circunscripción
   for (const [circunscripcion, circOffices] of Object.entries(groupedOffices)) {
     const startRow = currentRow;
+    let statusCounters = statusColumns.map(() => 0);
 
-    // Agregar oficinas
+    // Agregar datos de oficinas
     circOffices.forEach((office) => {
       const statusMarks = generateStatusMarks(office, statusColumns);
       const rowData = [
@@ -124,127 +81,99 @@ export const exportOfficesToExcel = async (offices) => {
         const cell = row.getCell(index + 1);
         cell.value = value;
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        
+        // Contar X en columnas de estado
+        if (index >= 8 && value === 'X') {
+          statusCounters[index - 8]++;
+        }
       });
       currentRow++;
     });
 
-    // ============================================================
-    // FILA DE SUBTOTAL POR CIRCUNSCRIPCIÓN
-    // ============================================================
-    const subtotalRow = currentRow;
-    const row = worksheet.getRow(subtotalRow);
+    // Fila de subtotal
+    const subtotalRow = worksheet.getRow(currentRow);
+    subtotalRow.getCell(1).value = `Subtotal - ${circunscripcion}`;
+    subtotalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    subtotalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
+    subtotalRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
 
-    // Etiqueta de subtotal
-    const labelCell = row.getCell(1);
-    labelCell.value = `Subtotal - ${circunscripcion}`;
-    labelCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
-    labelCell.alignment = { horizontal: 'left', vertical: 'middle' };
-
-    // Combinar celdas para subtotal (A a D)
-    worksheet.mergeCells(`A${subtotalRow}:D${subtotalRow}`);
-
-    // Fórmulas de subtotal para columnas numéricas
-    numericColumns.forEach((colNum) => {
-      const cell = row.getCell(colNum);
-      const colLetter = getColumnLetter(colNum);
-      const formulaStr = `=SUM(${colLetter}${startRow}:${colLetter}${subtotalRow - 1})`;
-      
-      try {
-        cell.value = { formula: formulaStr };
-      } catch (e) {
-        // Si falla la fórmula, usar valor calculado
-        const sum = circOffices.reduce((acc, office) => {
-          if (colNum === 5) return acc + (office.juntas || 0);
-          if (colNum === 6) return acc + (office.juntasMen || 0);
-          if (colNum === 7) return acc + (office.juntasWomen || 0);
-          return acc;
-        }, 0);
-        cell.value = sum;
+    // Sumar números (columnas 5, 6, 7)
+    [5, 6, 7].forEach((colNum) => {
+      let sum = 0;
+      for (let r = startRow; r < currentRow; r++) {
+        const val = worksheet.getRow(r).getCell(colNum).value;
+        sum += typeof val === 'number' ? val : 0;
       }
-      
+      const cell = subtotalRow.getCell(colNum);
+      cell.value = sum;
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
     });
 
-    // Aplicar estilo a celdas de estado en subtotal
-    for (let col = 9; col <= headers.length; col++) {
-      const cell = row.getCell(col);
+    // Sumar X por cada estado
+    statusColumns.forEach((_, index) => {
+      const cell = subtotalRow.getCell(9 + index);
+      cell.value = statusCounters[index];
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF666666' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    }
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
 
-    totalsMap.set(circunscripcion, subtotalRow);
+    subtotalRow.height = 18;
     currentRow++;
   }
 
-  // ============================================================
-  // 6. FILA DE TOTAL GENERAL
-  // ============================================================
-  grandTotalRow = currentRow;
-  const totalRow = worksheet.getRow(grandTotalRow);
+  // Total General
+  const totalRow = worksheet.getRow(currentRow);
+  totalRow.getCell(1).value = 'TOTAL GENERAL';
+  totalRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
+  totalRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-  const totalLabelCell = totalRow.getCell(1);
-  totalLabelCell.value = 'TOTAL GENERAL';
-  totalLabelCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-  totalLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-  totalLabelCell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-  worksheet.mergeCells(`A${grandTotalRow}:D${grandTotalRow}`);
-
-  // Fórmulas de total general
-  numericColumns.forEach((colNum) => {
+  // Totales generales
+  [5, 6, 7].forEach((colNum) => {
+    let sum = 0;
+    for (let r = 6; r < currentRow; r++) {
+      const val = worksheet.getRow(r).getCell(colNum).value;
+      sum += typeof val === 'number' ? val : 0;
+    }
     const cell = totalRow.getCell(colNum);
-    const colLetter = getColumnLetter(colNum);
-    
-    // Sumar valores directamente de los datos
-    let totalValue = 0;
-    offices.forEach((office) => {
-      if (colNum === 5) totalValue += office.juntas || 0;
-      if (colNum === 6) totalValue += office.juntasMen || 0;
-      if (colNum === 7) totalValue += office.juntasWomen || 0;
-    });
-    
-    cell.value = totalValue;
-    cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-  });
-
-  // Aplicar estilo a celdas de estado en total
-  for (let col = 9; col <= headers.length; col++) {
-    const cell = totalRow.getCell(col);
+    cell.value = sum;
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
-  }
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  });
 
-  // ============================================================
-  // 7. AJUSTAR ANCHO DE COLUMNAS
-  // ============================================================
+  // Total X por estado
+  statusColumns.forEach((_, index) => {
+    let totalX = 0;
+    for (let r = 6; r < currentRow; r++) {
+      const val = worksheet.getRow(r).getCell(9 + index).value;
+      totalX += typeof val === 'number' ? val : 0;
+    }
+    const cell = totalRow.getCell(9 + index);
+    cell.value = totalX;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  });
+
+  totalRow.height = 20;
+
+  // Ajustar anchos de columnas
   worksheet.columns = [
-    { width: 20 },
-    { width: 15 },
-    { width: 20 },
-    { width: 15 },
-    { width: 10 },
-    { width: 10 },
-    { width: 10 },
-    { width: 12 },
+    { width: 20 }, { width: 15 }, { width: 22 }, { width: 15 },
+    { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 },
     ...statusColumns.map(() => ({ width: 12 })),
   ];
 
-  // ============================================================
-  // 8. GENERAR Y DESCARGAR ARCHIVO
-  // ============================================================
+  // Generar y descargar
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -252,41 +181,20 @@ export const exportOfficesToExcel = async (offices) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `reporte-seguimiento-cne-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  link.download = `reporte-cne-${new Date().toISOString().slice(0, 10)}.xlsx`;
   link.click();
   URL.revokeObjectURL(url);
 };
 
-/**
- * Convierte número de columna a letra (1 = A, 2 = B, etc.)
- */
-function getColumnLetter(colNum) {
-  let letter = '';
-  while (colNum > 0) {
-    colNum--;
-    letter = String.fromCharCode(65 + (colNum % 26)) + letter;
-    colNum = Math.floor(colNum / 26);
-  }
-  return letter;
-}
-
-/**
- * Agrupa las oficinas por circunscripción
- */
 function groupByCircunscripcion(offices) {
   return offices.reduce((acc, office) => {
     const circunscripcion = office.circunscription || 'Sin Circunscripción';
-    if (!acc[circunscripcion]) {
-      acc[circunscripcion] = [];
-    }
+    if (!acc[circunscripcion]) acc[circunscripcion] = [];
     acc[circunscripcion].push(office);
     return acc;
   }, {});
 }
 
-/**
- * Genera marcas de estado (X o -) para cada columna de estado
- */
 function generateStatusMarks(office, statusColumns) {
   const currentStatus = getOfficeStatus(office);
   const currentStatusIndex = statusColumns.findIndex(([status]) => status === currentStatus);
@@ -300,9 +208,6 @@ function generateStatusMarks(office, statusColumns) {
   });
 }
 
-/**
- * Determina el estado actual de una oficina basado en hitos completados
- */
 function getOfficeStatus(office) {
   const completed = Object.values(office.milestones || {}).filter(Boolean).length;
   if (completed >= 6) return 'finalizado';
