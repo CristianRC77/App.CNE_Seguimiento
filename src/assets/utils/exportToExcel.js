@@ -14,7 +14,7 @@ export const exportOfficesToExcel = async (offices) => {
   // 1. CONFIGURACIÓN INICIAL
   // ============================================================
   worksheet.pageSetup = {
-    paperSize: ExcelJS.Worksheet.paperSize.a4,
+    paperSize: 9,
     orientation: 'landscape',
     margins: { left: 0.5, right: 0.5, top: 1, bottom: 1 }
   };
