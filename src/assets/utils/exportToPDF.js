@@ -13,78 +13,76 @@ export const exportOfficesToPDF = (offices) => {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    let currentY = 15;
+    let currentY = 10;
 
     // ============================================================
-    // ENCABEZADO
+    // ENCABEZADO PROFESIONAL
     // ============================================================
     
-    // Fondo azul marino para título
+    // Fondo azul marino
     doc.setFillColor(31, 78, 120);
-    doc.rect(0, currentY - 5, pageWidth, 15, 'F');
+    doc.rect(0, currentY, pageWidth, 30, 'F');
     
-    // Logo placeholder
+    // Logo placeholder (lado izquierdo)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(11);
     doc.setTextColor(100, 100, 100);
-    doc.text('[LOGO]', 15, currentY + 3);
+    doc.text('[LOGO]', 15, currentY + 15, { align: 'center' });
     
-    // Título
+    // Títulos (centro-derecha)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.text('CONSEJO NACIONAL ELECTORAL', pageWidth / 2, currentY + 3, { align: 'center' });
-    
-    currentY += 18;
-
-    // Fondo gris para subtítulo
-    doc.setFillColor(200, 200, 200);
-    doc.rect(0, currentY - 3, pageWidth, 8, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text('Dirección de Procesos en el Exterior', 15, currentY + 1);
+    doc.text('CONSEJO NACIONAL ELECTORAL', pageWidth / 2, currentY + 10, { align: 'center' });
     
-    currentY += 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Dirección de Procesos en el Exterior', pageWidth / 2, currentY + 20, { align: 'center' });
+    
+    currentY += 32;
 
     // Fecha y hora
     const now = new Date();
     const dateTimeStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
     doc.text(`Reporte de ${dateTimeStr}`, 15, currentY);
     
     currentY += 8;
 
     // ============================================================
-    // TABLA SIMPLIFICADA
+    // TABLA DE DATOS - MEJOR ESPACIADA
     // ============================================================
     
     const statusColumns = Object.entries(statusInfo);
     
-    // Generar tabla simple de texto
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
+    // Posiciones de columnas (mejor distribuidas)
+    const colX = [12, 28, 48, 68, 85, 95, 105, 115, 125];
+    const colWidths = [15, 18, 18, 15, 10, 8, 8, 8, 8];
+    
+    const headers = ['Circunscripción', 'País', 'Oficina', 'Zona', 'Juntas', 'H', 'M', 'Tipo', 'Estado'];
+    
+    // Encabezados de tabla
     doc.setFillColor(31, 78, 120);
+    doc.rect(12, currentY, pageWidth - 24, 7, 'F');
     
-    // Encabezados
-    const colX = [10, 25, 42, 62, 77, 87, 97, 107];
-    const headers = ['Circunscripción', 'País', 'Oficina', 'Zona', 'Juntas', 'Hombres', 'Mujeres', 'Tipo'];
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
     
-    doc.rect(10, currentY, pageWidth - 20, 6, 'F');
     headers.forEach((header, idx) => {
-      doc.text(header, colX[idx], currentY + 4, { maxWidth: 12 });
+      doc.text(header, colX[idx], currentY + 4.5, { maxWidth: colWidths[idx] - 1, align: 'center' });
     });
     
-    currentY += 7;
+    currentY += 8;
 
     // Datos
     const groupedOffices = groupByCircunscripcion(offices);
     let rowNum = 0;
+    const pageMargin = pageHeight - 15;
 
     for (const [circunscripcion, circOffices] of Object.entries(groupedOffices)) {
       let juntas = 0, hombres = 0, mujeres = 0;
@@ -95,70 +93,101 @@ export const exportOfficesToPDF = (offices) => {
         mujeres += office.juntasWomen || 0;
 
         // Fila de oficina
-        const bgColor = rowNum % 2 === 0 ? [255, 255, 255] : [240, 240, 240];
+        const bgColor = rowNum % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
         doc.setFillColor(...bgColor);
-        doc.rect(10, currentY, pageWidth - 20, 4, 'F');
+        doc.rect(12, currentY, pageWidth - 24, 5, 'F');
         
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(8);
+        doc.setTextColor(30, 30, 30);
         
-        doc.text(circunscripcion.substring(0, 15), colX[0], currentY + 2.5);
-        doc.text((office.country || '').substring(0, 10), colX[1], currentY + 2.5);
-        doc.text((office.name || '').substring(0, 15), colX[2], currentY + 2.5);
-        doc.text((office.zone || '').substring(0, 10), colX[3], currentY + 2.5);
-        doc.text(String(office.juntas || 0), colX[4], currentY + 2.5, { align: 'center' });
-        doc.text(String(office.juntasMen || 0), colX[5], currentY + 2.5, { align: 'center' });
-        doc.text(String(office.juntasWomen || 0), colX[6], currentY + 2.5, { align: 'center' });
-        doc.text((office.type || '').substring(0, 10), colX[7], currentY + 2.5);
+        // Texto - mejor proporcionado
+        const circ = circunscripcion.substring(0, 12);
+        const country = (office.country || '').substring(0, 15);
+        const name = (office.name || '').substring(0, 15);
+        const zone = (office.zone || '').substring(0, 12);
+        const type = (office.type || '').substring(0, 6);
         
-        currentY += 4;
+        doc.text(circ, colX[0], currentY + 3.2, { maxWidth: colWidths[0] - 1, align: 'left' });
+        doc.text(country, colX[1], currentY + 3.2, { maxWidth: colWidths[1] - 1, align: 'left' });
+        doc.text(name, colX[2], currentY + 3.2, { maxWidth: colWidths[2] - 1, align: 'left' });
+        doc.text(zone, colX[3], currentY + 3.2, { maxWidth: colWidths[3] - 1, align: 'left' });
+        doc.text(String(office.juntas || 0), colX[4], currentY + 3.2, { align: 'center' });
+        doc.text(String(office.juntasMen || 0), colX[5], currentY + 3.2, { align: 'center' });
+        doc.text(String(office.juntasWomen || 0), colX[6], currentY + 3.2, { align: 'center' });
+        doc.text(type, colX[7], currentY + 3.2, { maxWidth: colWidths[7] - 1, align: 'center' });
+        
+        currentY += 5.5;
         rowNum++;
 
-        if (currentY > pageHeight - 15) {
+        // Salto de página si es necesario
+        if (currentY > pageMargin - 10) {
           doc.addPage();
-          currentY = 15;
+          
+          // Repetir encabezado en nueva página
+          doc.setFillColor(31, 78, 120);
+          doc.rect(12, 10, pageWidth - 24, 7, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(255, 255, 255);
+          headers.forEach((header, idx) => {
+            doc.text(header, colX[idx], 13.5, { maxWidth: colWidths[idx] - 1, align: 'center' });
+          });
+          
+          currentY = 18;
         }
       });
 
-      // Subtotal
+      // Fila de subtotal
       doc.setFillColor(220, 220, 220);
-      doc.rect(10, currentY, pageWidth - 20, 4, 'F');
+      doc.rect(12, currentY, pageWidth - 24, 5.5, 'F');
       
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(8);
       doc.setTextColor(0, 0, 0);
       
-      doc.text(`Subtotal - ${circunscripcion}`, colX[0], currentY + 2.5);
-      doc.text(String(juntas), colX[4], currentY + 2.5, { align: 'center' });
-      doc.text(String(hombres), colX[5], currentY + 2.5, { align: 'center' });
-      doc.text(String(mujeres), colX[6], currentY + 2.5, { align: 'center' });
+      doc.text(`Subtotal: ${circunscripcion}`, colX[0], currentY + 3.2, { maxWidth: 50 });
+      doc.text(String(juntas), colX[4], currentY + 3.2, { align: 'center' });
+      doc.text(String(hombres), colX[5], currentY + 3.2, { align: 'center' });
+      doc.text(String(mujeres), colX[6], currentY + 3.2, { align: 'center' });
       
-      currentY += 4;
+      currentY += 6;
       rowNum++;
 
-      if (currentY > pageHeight - 15) {
+      if (currentY > pageMargin - 10) {
         doc.addPage();
-        currentY = 15;
+        
+        // Repetir encabezado en nueva página
+        doc.setFillColor(31, 78, 120);
+        doc.rect(12, 10, pageWidth - 24, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255);
+        headers.forEach((header, idx) => {
+          doc.text(header, colX[idx], 13.5, { maxWidth: colWidths[idx] - 1, align: 'center' });
+        });
+        
+        currentY = 18;
       }
     }
 
     // Total General
+    currentY += 2;
     doc.setFillColor(31, 78, 120);
-    doc.rect(10, currentY, pageWidth - 20, 5, 'F');
+    doc.rect(12, currentY, pageWidth - 24, 6, 'F');
     
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
     
     let totalJuntas = offices.reduce((sum, o) => sum + (o.juntas || 0), 0);
     let totalHombres = offices.reduce((sum, o) => sum + (o.juntasMen || 0), 0);
     let totalMujeres = offices.reduce((sum, o) => sum + (o.juntasWomen || 0), 0);
     
-    doc.text('TOTAL GENERAL', colX[0], currentY + 3);
-    doc.text(String(totalJuntas), colX[4], currentY + 3, { align: 'center' });
-    doc.text(String(totalHombres), colX[5], currentY + 3, { align: 'center' });
-    doc.text(String(totalMujeres), colX[6], currentY + 3, { align: 'center' });
+    doc.text('TOTAL GENERAL', colX[0], currentY + 3.5);
+    doc.text(String(totalJuntas), colX[4], currentY + 3.5, { align: 'center' });
+    doc.text(String(totalHombres), colX[5], currentY + 3.5, { align: 'center' });
+    doc.text(String(totalMujeres), colX[6], currentY + 3.5, { align: 'center' });
 
     // Descargar
     const filename = `reporte-cne-${new Date().toISOString().slice(0, 10)}.pdf`;
