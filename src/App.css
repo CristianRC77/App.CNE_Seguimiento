@@ -976,6 +976,7 @@ td strong {
   font-weight: 700;
 }
 
+
 .status-pill:before {
   content: '';
   width: 5px;

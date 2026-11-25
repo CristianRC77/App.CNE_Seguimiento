@@ -1,9 +1,9 @@
 export default function DashboardHeader({ activeTab }) {
   // Relaciona cada pestaña con el título que debe ver el usuario.
   const titles = {
-    resumen: 'Resumen General del Proceso',
-    oficinas: 'Avances de Zonas Electorales',
-    avances: 'Registro de Hitos Electorales',
+    resumen: 'Resumen General de Zonas Electorales',
+    oficinas: 'Avances por Zonas Electorales',
+    avances: 'Registro de Avances de Zonas Electorales',
     reportes: 'Reportes Electorales',
   };
 

@@ -52,7 +52,7 @@ export default function MilestoneEditor({
         <div className="editor-section-heading">
           <div>
             <h2>Zonas Electorales</h2>
-            <p>Selecciona una oficina para registrar sus avances.</p>
+            <p>Selecciona una zona electoral para registrar su avance.</p>
           </div>
           <span className="office-count">{filteredOffices.length}</span>
         </div>
@@ -113,7 +113,7 @@ export default function MilestoneEditor({
       <section className="tab-view milestone-editor-card">
         <div className="editor-section-heading">
           <div>
-            <p className="editor-kicker">OFICINA SELECCIONADA</p>
+            <p className="editor-kicker">ZONA ELECTORAL SELECCIONADA</p>
             <h2>{selectedOffice.name}</h2>
             <p className="subtext">
               {selectedOffice.country} · {selectedOffice.zone} · Última actualización: {selectedOffice.updated}

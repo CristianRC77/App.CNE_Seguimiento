@@ -123,14 +123,14 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
         <div className="panel-heading">
           <div>
             <h2>Avance general</h2>
-            <p>Porcentaje ponderado según electores</p>
+            <p>Porcentaje según electores</p>
           </div>
         </div>
         <div className="progress-content">
           <div className="donut" style={{ '--percent': `${stats.average * 3.6}deg` }}>
             <div>
               <strong>{stats.average}%</strong>
-              <span>zonas consulares</span>
+              <span>Zonas Consulares</span>
             </div>
           </div>
           <div className="legend">

@@ -63,16 +63,16 @@ export const exportOfficesToExcel = async (offices) => {
     const NAVY_TEXT = 'FF1B3A6B';
     const BLACK     = 'FF000000';
 
-    // ── Definición de columnas ────────────────────────────────────
+    // ── Definición de columnas y Encabezado de la fila y mostramos nomnbres ────────────────────────────────────
     const headers    = ['Circunscripción','País','Oficina','Zona','Juntas','H','M','Tipo',
-                        ' I.','Insta','Escrut','Digit','Compl'];
+                        ' Sin Iniciar','Instalacion','Escrutinio','Digitizacion','Finalizado'];
     const colCount   = headers.length;        // 13
     const lastCol    = colLetter(colCount);   // M
     const logoEnd    = colLetter(3);          // C  — logo en A:C
     const titleStart = colLetter(4);          // D  — texto en D:M
     const colAligns  = ['left','left','left','left','center','center','center','center',
                         'center','center','center','center','center'];
-    const widths     = [26, 16, 24, 16, 8, 5, 5, 12, 6, 6, 8, 8, 8];
+    const widths     = [26, 16, 24, 16, 8, 5, 5, 12, 12, 12, 12, 12, 12]; // ancho de las columnas
 
     const worksheet = workbook.addWorksheet('Reporte', {
       views: [{ state: 'frozen', ySplit: 5 }],
@@ -103,20 +103,6 @@ export const exportOfficesToExcel = async (offices) => {
       for (let i = 1; i <= colCount; i++)
         r.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
     };
-
-    // ================================================================
-    // ENCABEZADO  (filas 1-3)
-    //
-    //  A──C (logo)   |  D──────────────────────────── M
-    //  ┌─────────────┼──────────────────────────────────┐
-    //  │             │  CONSEJO NACIONAL ELECTORAL       │  fila 1 — alto 60, blanco
-    //  │  LOGO CNE   ├──────────────────────────────────┤
-    //  │             │  Dirección de Procesos...  (bold) │  fila 2 — gris suave
-    //  │             │  Reporte de seguimiento... (ital) │  fila 3 — gris suave
-    //  └─────────────┴──────────────────────────────────┘
-    //  Fecha generación: ...          Total oficinas: N    fila 4 — info
-    //  Circunscripción | País | ...                        fila 5 — cabecera tabla
-    // ================================================================
 
     // Alturas de filas del encabezado
     worksheet.getRow(1).height = 30;
@@ -192,7 +178,7 @@ export const exportOfficesToExcel = async (offices) => {
       cell.font      = { bold: true, size: 10, color: { argb: WHITE } };
       cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
       cell.alignment = { horizontal: colAligns[i], vertical: 'middle',
-                         indent: colAligns[i] === 'left' ? 1 : 0 };
+                        indent: colAligns[i] === 'left' ? 1 : 0 };
       cell.border    = thinBorder(DARK_GRID);
     });
 

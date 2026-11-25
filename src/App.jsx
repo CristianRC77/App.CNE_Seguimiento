@@ -1115,7 +1115,9 @@ export default function App() {
             <div className="tab-view reports-container">
               <h2>Reportes de seguimiento</h2>
               <small>
-                Selecciona una circunscripción o una etapa. Las etapas incluyen también las zonas que ya avanzaron.
+                Seleccione una circunscripción o una etapa. Las etapas incluyen las zonas que se encuentran
+                 en diferentes niveles de avance, las cuales puede seleccionar para generar el reporte 
+                 correspondiente.
               </small>
             <p />
               <div className="filter-tabs report-filter-tabs">
