@@ -17,7 +17,7 @@ export const exportOfficesToPDF = (offices) => {
     const contentWidth = pageWidth - margin * 2;
     let currentY = 10;
 
-    const LOGO_BASE64 = '/public/images/logo-cne1.png'; 
+    const LOGO_BASE64 = '/images/logo-cne1.png'; 
     
     // ============================================================
     // 🚀 FUNCIÓN CLAVE: DETECTA CUALQUIER TIPO DE VALOR COMO "TRUE"
