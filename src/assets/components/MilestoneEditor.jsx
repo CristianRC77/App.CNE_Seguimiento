@@ -91,7 +91,10 @@ export default function MilestoneEditor({
               <button
                 key={office.id}
                 className={`office-selector ${selectedId === office.id ? 'selected' : ''}`}
-                onClick={() => setSelectedId(office.id)}
+                onClick={() => {
+                  setSelectedActaType(null);
+                  setSelectedId(office.id);
+                }}
               >
                 <span className="office-selector-info">
                   <strong>{office.zone}</strong>
@@ -171,7 +174,6 @@ export default function MilestoneEditor({
                     setSelectedActaType(actaType);
                     return;
                   }
-                  if (milestoneIndex === 3) setSelectedActaType('escrutinio');
                   updateMilestone(selectedOffice.id, milestone.id);
                 }}
                 disabled={!isEnabled}
@@ -245,7 +247,7 @@ export default function MilestoneEditor({
                         checked={Boolean(actas[key][index])}
                         onChange={() => updateActa(selectedOffice.id, selectedActaType, key, index)}
                       />
-                      <span>Junta {index + 1}</span>
+                      <span>{selectedActaType === 'escrutinio' ? 'Acta' : 'Junta'} {index + 1}</span>
                     </label>
                   ))}
                 </div>
