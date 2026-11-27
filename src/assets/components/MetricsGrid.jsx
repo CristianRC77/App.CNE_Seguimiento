@@ -6,8 +6,8 @@ export default function MetricsGrid({ stats }) {
       <div className="stat-card">
         <span className="stat-icon">🏛️</span>
         <div className="metric-content">
-          <h3>{stats.total}</h3>
-          <p>Total Zonas Electorales</p>
+          <h3> {stats.total}</h3>
+          <p>Total de Zonas Electorales participantes </p>
         </div>
       </div>
       <div className="stat-card">

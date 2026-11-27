@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { updateBrandConfig } from '../constants/brandConfig.js';
 import './BrandingAdmin.css';
 
-export default function BrandingAdmin({ authSession, onConfigUpdated }) {
+export default function BrandingAdmin({ authSession, onConfigUpdated }) { // Componente para la administración de la configuración de marca
   const [formData, setFormData] = useState({
     organizationName: 'Consejo Nacional Electoral',
-    subtitle: 'Oficinas Consulares',
+    subtitle: 'Oficinas Consulares', // Subtítulo que aparece debajo del nombre de la organización
     logoPath: '/images/logo-cne.png',
     logoAlt: 'Logo CNE',
     reportTitle: 'Reporte de Seguimiento CNE',

@@ -6,7 +6,7 @@
 // Configuración por defecto (fallback)
 const defaultConfig = {
   organizationName: 'Consejo Nacional Electoral',
-  subtitle: 'Oficinas Consulares',
+  subtitle: 'Zonas Electorales',
   logoPath: '/images/logo-cne.png',
   logoAlt: 'Logo CNE',
   reportTitle: 'Reporte de Seguimiento CNE',

@@ -15,9 +15,9 @@ export default function Sidebar({
   authSession,
   onLogout,
 }) {
-  const [brandConfig, setBrandConfig] = useState({
+  const [brandConfig, setBrandConfig] = useState({ // Configuración de marca por defecto
     organizationName: 'Consejo Nacional Electoral',
-    subtitle: 'Oficinas Consulares',
+    subtitle: 'Oficinas Consulares', // Subtítulo que aparece debajo del nombre de la organización
     logoPath: '/images/logo-cne.png',
     logoAlt: 'Logo CNE',
   });

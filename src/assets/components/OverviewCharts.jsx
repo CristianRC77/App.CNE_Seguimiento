@@ -173,7 +173,7 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
             <h2>Avance por circunscripción</h2>
             <p>Digitalización de actas de escrutinio e instalación</p>
           </div>
-          <strong className="circunscription-total-progress">{totalActasProgress.percentage}% general</strong>
+          
         </div>
         <div className="circunscription-progress-list">
           {circunscriptionProgress.map((item) => (
@@ -211,8 +211,8 @@ export default function OverviewCharts({ offices, stats, statusInfo, getOfficeSt
       <article className="panel acts-progress-panel">
         <div className="panel-heading">
           <div>
-            <h2>Actas digitalizadas Escrutinio - Instalación</h2>
-            <p>Progreso de actas digitalizadas en los procesos de escrutinio e instalación</p>
+            <h2>Actas digitalizadas de Escrutinio e Instalación</h2>
+            <p>Progreso general de actas digitalizadas en los procesos de escrutinio e instalación</p>
           </div>
         </div>
         <div className="acts-progress">
