@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 // Mantiene consistentes los números de electores y juntas en la tabla.
 const formatNumber = (value) => new Intl.NumberFormat('es-EC').format(value);
-const ROWS_PER_PAGE = 15;
+const ROWS_PER_PAGE = 10;
 
 export default function OfficesTable({ 
   filteredOffices, 

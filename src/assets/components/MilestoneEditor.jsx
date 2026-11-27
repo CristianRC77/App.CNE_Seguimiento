@@ -24,7 +24,27 @@ export default function MilestoneEditor({
   const [zoneSearch, setZoneSearch] = useState('');
   // Los valores siguientes alimentan el resumen de la zona seleccionada.
   const selectedStatus = getOfficeStatus(selectedOffice);
-  const completedMilestones = Object.values(selectedOffice.milestones).filter(Boolean).length;
+  const displayMilestones = [
+    {
+      ...milestones[0],
+      ids: [milestones[0].id, milestones[1].id],
+      label: 'Instalación de MJRV e inicio de votación',
+    },
+    {
+      ...milestones[2],
+      ids: [milestones[2].id, milestones[3].id],
+      label: 'Fin de votación e inicio de escrutinio',
+      icon: '2',
+    },
+    ...milestones.slice(4).map((milestone, index) => ({
+      ...milestone,
+      ids: [milestone.id],
+      icon: String(index + 3),
+    })),
+  ];
+  const completedMilestones = displayMilestones.filter(
+    (milestone) => milestone.ids.every((id) => selectedOffice.milestones[id])
+  ).length;
   const actas = selectedOffice.actasDigitalizadas?.[selectedActaType] || { hombres: [], mujeres: [] };
   const actaMultiplier = selectedActaType === 'escrutinio' ? 3 : 1;
   const totalActasHombres = selectedOffice.juntasMen * actaMultiplier;
@@ -136,17 +156,18 @@ export default function MilestoneEditor({
               style={{ width: `${selectedOffice.progress}%` }}
             />
           </div>
-          <span className="milestone-count">{completedMilestones}/{milestones.length} hitos</span>
+          <span className="milestone-count">{completedMilestones}/{displayMilestones.length} hitos</span>
         </div>
 
         <div className="milestones-grid">
-          {milestones.map((milestone) => {
+          {displayMilestones.map((milestone, milestoneIndex) => {
             // Cada botón representa un hito y determina si puede marcarse o revertirse.
-            const milestoneIndex = milestones.findIndex((item) => item.id === milestone.id);
-            const milestoneStates = milestones.map((item) => Boolean(selectedOffice.milestones[item.id]));
+            const milestoneStates = displayMilestones.map((item) => (
+              item.ids.every((id) => Boolean(selectedOffice.milestones[id]))
+            ));
             const isChecked = milestoneStates[milestoneIndex];
-            const isDigitalization = milestoneIndex >= 4;
-            const actaType = milestoneIndex === 4 ? 'escrutinio' : 'instalacion';
+            const isDigitalization = milestoneIndex >= 2;
+            const actaType = milestoneIndex === 2 ? 'escrutinio' : 'instalacion';
             const isActaComplete = isDigitalization
               ? [selectedOffice.actasDigitalizadas?.[actaType]?.hombres || [],
                 selectedOffice.actasDigitalizadas?.[actaType]?.mujeres || []]
@@ -156,13 +177,15 @@ export default function MilestoneEditor({
             const isSelected = isDigitalization && selectedActaType === actaType;
             const canMark = !isChecked && (
               isDigitalization
-                ? milestoneStates[3]
+                ? milestoneStates[1]
                 : milestoneStates.slice(0, milestoneIndex).every(Boolean)
             );
             const canUnmark = isChecked && (
               isDigitalization
                 ? true
-                : milestoneStates.slice(milestoneIndex + 1).every((completed) => !completed)
+                : displayMilestones.slice(milestoneIndex + 1).every((item) => (
+                  item.ids.every((id) => !selectedOffice.milestones[id])
+                ))
             );
             const isEnabled = canMark || canUnmark;
             return (
@@ -174,7 +197,7 @@ export default function MilestoneEditor({
                     setSelectedActaType(actaType);
                     return;
                   }
-                  updateMilestone(selectedOffice.id, milestone.id);
+                  updateMilestone(selectedOffice.id, milestone.ids);
                 }}
                 disabled={!isEnabled}
                 aria-pressed={isDigitalization ? isSelected : isChecked}

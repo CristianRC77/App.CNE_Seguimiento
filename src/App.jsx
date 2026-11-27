@@ -340,7 +340,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
+  useEffect(() => { // Efecto para cargar y suscribirse a los datos de seguimiento
     let active = true;
 
     const cachedOffices = getCachedSeguimiento();
@@ -860,13 +860,14 @@ export default function App() {
   }, [offices, participatingOffices]);
 
   // Marca o desmarca un hito respetando el orden del proceso electoral.
-  const updateMilestone = (id, milestoneId) => {
+  const updateMilestone = (id, milestoneIds) => {
     const office = offices.find((item) => item.id === id);
     if (!office) return;
 
-    const milestoneIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
+    const milestoneIndex = milestones.findIndex((milestone) => milestone.id === milestoneIds[0]);
+    const lastMilestoneIndex = milestoneIndex + milestoneIds.length - 1;
     const completedMilestones = milestones.map((milestone) => Boolean(office.milestones[milestone.id]));
-    const isChecked = completedMilestones[milestoneIndex];
+    const isChecked = milestoneIds.every((milestoneId) => Boolean(office.milestones[milestoneId]));
     const isDigitalization = milestoneIndex >= 4;
     const isNextToMark = !isChecked && (
       isDigitalization
@@ -876,12 +877,15 @@ export default function App() {
     const isLastToUnmark = isChecked && (
       isDigitalization
         ? true
-        : completedMilestones.slice(milestoneIndex + 1).every((completed) => !completed)
+        : completedMilestones.slice(lastMilestoneIndex + 1).every((completed) => !completed)
     );
 
     if (!isNextToMark && !isLastToUnmark) return;
 
-    const nextMilestones = { ...office.milestones, [milestoneId]: !isChecked };
+    const nextMilestones = { ...office.milestones };
+    milestoneIds.forEach((milestoneId) => {
+      nextMilestones[milestoneId] = !isChecked;
+    });
     const nextOffices = offices.map((item) => item.id === id
       ? {
           ...item,
